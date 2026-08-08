@@ -17,8 +17,13 @@ import type { Alimentador, ElementoEstado, TipoElemento } from "@/types";
 const TODOS_LOS_TIPOS: TipoElemento[] = [
   "reconectador",
   "seccionador",
+  "cuchilla",
   "omnirouter",
   "transformador",
+  "capacitor",
+  "central_termica",
+  "barra",
+  "generador",
 ];
 
 export default function MapaPage() {
@@ -74,7 +79,7 @@ export default function MapaPage() {
     setModoAltaElemento(false);
   }
 
-  if (!cargado) return null; // evita parpadeo mientras se lee localStorage
+  if (!cargado) return null;
 
   if (!usuario) {
     return <IdentificacionOperario onIdentificado={setUsuario} />;
@@ -103,7 +108,6 @@ export default function MapaPage() {
         </div>
       )}
 
-      {/* Botón flotante: alta de elemento (cualquiera de los 4 tipos) */}
       <button
         onClick={() => setModoAltaElemento((v) => !v)}
         className={`fixed bottom-4 left-4 z-20 h-touch px-4 rounded-full font-semibold shadow-lg transition ${
