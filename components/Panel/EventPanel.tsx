@@ -6,7 +6,7 @@ import {
   actualizarElemento,
   darDeBajaElemento,
 } from "@/services/elementosService";
-import { COLOR_ESTADO, LABEL_ESTADO, LABEL_TIPO } from "@/lib/estado";
+import { COLOR_ESTADO, LABEL_ESTADO, LABEL_TIPO, TIPOS_SIN_MANIOBRA } from "@/lib/estado";
 import type { Alimentador, ElementoEstado } from "@/types";
 
 interface EventPanelProps {
@@ -54,7 +54,7 @@ export function EventPanel({
     setGuardandoEdicion(true);
     try {
       await actualizarElemento(elemento.id, { nombre, alimentador_id });
-      onEventoRegistrado(false); // reutiliza el mismo refresh que un evento
+      onEventoRegistrado(false);
       onCerrarPanel();
     } finally {
       setGuardandoEdicion(false);
@@ -177,12 +177,14 @@ export function EventPanel({
               {elemento.alimentador_nombre ? ` · ${elemento.alimentador_nombre}` : ""}
             </p>
             <h2 className="font-display text-2xl leading-tight">{elemento.nombre}</h2>
-            <p
-              className="text-sm mt-1 font-semibold"
-              style={{ color: COLOR_ESTADO[elemento.estado] }}
-            >
-              Estado actual: {LABEL_ESTADO[elemento.estado]}
-            </p>
+            {!TIPOS_SIN_MANIOBRA.has(elemento.tipo) && (
+              <p
+                className="text-sm mt-1 font-semibold"
+                style={{ color: COLOR_ESTADO[elemento.estado] }}
+              >
+                Estado actual: {LABEL_ESTADO[elemento.estado]}
+              </p>
+            )}
           </div>
           <button
             onClick={onCerrarPanel}
@@ -193,22 +195,24 @@ export function EventPanel({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => handleRegistrar("apertura")}
-            disabled={enviando !== null}
-            className="h-16 rounded-xl bg-estado-abierto text-white font-display text-2xl tracking-wide disabled:opacity-50 active:scale-95 transition"
-          >
-            {enviando === "apertura" ? "Guardando…" : "ABRIR"}
-          </button>
-          <button
-            onClick={() => handleRegistrar("cierre")}
-            disabled={enviando !== null}
-            className="h-16 rounded-xl bg-estado-cerrado text-white font-display text-2xl tracking-wide disabled:opacity-50 active:scale-95 transition"
-          >
-            {enviando === "cierre" ? "Guardando…" : "CERRAR"}
-          </button>
-        </div>
+        {!TIPOS_SIN_MANIOBRA.has(elemento.tipo) && (
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => handleRegistrar("apertura")}
+              disabled={enviando !== null}
+              className="h-16 rounded-xl bg-estado-abierto text-white font-display text-2xl tracking-wide disabled:opacity-50 active:scale-95 transition"
+            >
+              {enviando === "apertura" ? "Guardando…" : "ABRIR"}
+            </button>
+            <button
+              onClick={() => handleRegistrar("cierre")}
+              disabled={enviando !== null}
+              className="h-16 rounded-xl bg-estado-cerrado text-white font-display text-2xl tracking-wide disabled:opacity-50 active:scale-95 transition"
+            >
+              {enviando === "cierre" ? "Guardando…" : "CERRAR"}
+            </button>
+          </div>
+        )}
 
         <button
           onClick={() => setEditando(true)}
