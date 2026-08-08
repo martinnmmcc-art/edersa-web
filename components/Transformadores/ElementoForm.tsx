@@ -3,8 +3,10 @@
 import { useState, FormEvent } from "react";
 import { crearElemento } from "@/services/elementosService";
 import { crearTransformador } from "@/services/transformadoresService";
+import { crearCapacitor } from "@/services/capacitoresService";
+import { crearGenerador } from "@/services/generadoresService";
 import { LABEL_TIPO } from "@/lib/estado";
-import type { Alimentador, TipoElemento } from "@/types";
+import type { Alimentador, TensionSecundariaBT, TipoElemento } from "@/types";
 
 interface ElementoFormProps {
   alimentadores: Alimentador[];
@@ -16,9 +18,16 @@ interface ElementoFormProps {
 const TIPOS: TipoElemento[] = [
   "reconectador",
   "seccionador",
+  "cuchilla",
   "omnirouter",
   "transformador",
+  "capacitor",
+  "central_termica",
+  "barra",
+  "generador",
 ];
+
+const OPCIONES_TENSION_SECUNDARIA: TensionSecundariaBT[] = ["220", "380", "380/220"];
 
 export function ElementoForm({
   alimentadores,
@@ -59,10 +68,30 @@ export function ElementoForm({
           lng,
           potencia_kva: Number(form.get("potencia_kva")),
           tension_primaria_kv: Number(form.get("tension_primaria_kv")),
-          tension_secundaria_kv: Number(form.get("tension_secundaria_kv")),
+          tension_secundaria_v: form.get("tension_secundaria_v") as TensionSecundariaBT,
           fases: Number(form.get("fases")) as 1 | 3,
           fabricante: String(form.get("fabricante") || ""),
           numero_serie: String(form.get("numero_serie") || ""),
+        });
+      } else if (tipo === "capacitor") {
+        await crearCapacitor({
+          nombre,
+          alimentador_id,
+          lat,
+          lng,
+          potencia_kvar: Number(form.get("potencia_kvar")),
+          tension_kv: Number(form.get("tension_kv")),
+          tipo: form.get("tipo_capacitor") as "fijo" | "automatico",
+        });
+      } else if (tipo === "generador") {
+        await crearGenerador({
+          nombre,
+          alimentador_id,
+          lat,
+          lng,
+          tipo_motor: form.get("tipo_motor") as "gas" | "diesel",
+          potencia_kva: Number(form.get("potencia_kva_generador")),
+          tension_salida_kv: Number(form.get("tension_salida_kv")),
         });
       } else {
         await crearElemento({ nombre, tipo, alimentador_id, lat, lng });
@@ -91,13 +120,13 @@ export function ElementoForm({
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <Campo label="Tipo">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {TIPOS.map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setTipo(t)}
-                  className={`h-touch rounded-lg text-sm font-semibold border ${
+                  className={`h-touch rounded-lg text-xs font-semibold border px-1 ${
                     tipo === t
                       ? "bg-acento text-panel border-acento"
                       : "bg-panel text-slate-300 border-panel-border"
@@ -175,15 +204,19 @@ export function ElementoForm({
                     className="campo-input"
                   />
                 </Campo>
-                <Campo label="Tensión secundaria (kV)">
-                  <input
-                    name="tension_secundaria_kv"
+                <Campo label="Tensión secundaria">
+                  <select
+                    name="tension_secundaria_v"
                     required
-                    type="number"
-                    step="any"
-                    defaultValue={0.4}
                     className="campo-input"
-                  />
+                    defaultValue="380/220"
+                  >
+                    {OPCIONES_TENSION_SECUNDARIA.map((v) => (
+                      <option key={v} value={v}>
+                        {v}V
+                      </option>
+                    ))}
+                  </select>
                 </Campo>
               </div>
               <Campo label="Fases">
@@ -198,6 +231,71 @@ export function ElementoForm({
                 </Campo>
                 <Campo label="N° de serie (opcional)">
                   <input name="numero_serie" className="campo-input" />
+                </Campo>
+              </div>
+            </>
+          )}
+
+          {tipo === "capacitor" && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <Campo label="Potencia reactiva (kVAr)">
+                  <input
+                    name="potencia_kvar"
+                    required
+                    type="number"
+                    step="any"
+                    className="campo-input"
+                    placeholder="Ej: 300"
+                  />
+                </Campo>
+                <Campo label="Tensión (kV)">
+                  <input
+                    name="tension_kv"
+                    required
+                    type="number"
+                    step="any"
+                    defaultValue={13.2}
+                    className="campo-input"
+                  />
+                </Campo>
+              </div>
+              <Campo label="Tipo de banco">
+                <select name="tipo_capacitor" className="campo-input" defaultValue="fijo">
+                  <option value="fijo">Fijo</option>
+                  <option value="automatico">Automático</option>
+                </select>
+              </Campo>
+            </>
+          )}
+
+          {tipo === "generador" && (
+            <>
+              <Campo label="Tipo de motor">
+                <select name="tipo_motor" className="campo-input" defaultValue="gas">
+                  <option value="gas">Gas</option>
+                  <option value="diesel">Diésel</option>
+                </select>
+              </Campo>
+              <div className="grid grid-cols-2 gap-3">
+                <Campo label="Potencia (kVA)">
+                  <input
+                    name="potencia_kva_generador"
+                    required
+                    type="number"
+                    step="any"
+                    className="campo-input"
+                  />
+                </Campo>
+                <Campo label="Tensión de salida (kV)">
+                  <input
+                    name="tension_salida_kv"
+                    required
+                    type="number"
+                    step="any"
+                    defaultValue={13.2}
+                    className="campo-input"
+                  />
                 </Campo>
               </div>
             </>
