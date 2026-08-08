@@ -1,12 +1,6 @@
 import { supabase } from "@/lib/supabase/client";
 import type { NuevoTransformadorInput } from "@/types";
 
-/**
- * Crea un transformador: primero el elemento base (mapa) y luego
- * su detalle técnico en `transformadores`, referenciando el elemento.
- * Si falla el segundo paso, revierte el elemento para no dejar
- * un marcador "transformador" sin datos técnicos.
- */
 export async function crearTransformador(input: NuevoTransformadorInput) {
   const { data: elemento, error: errElemento } = await supabase
     .from("elementos")
@@ -28,7 +22,7 @@ export async function crearTransformador(input: NuevoTransformadorInput) {
       elemento_id: elemento.id,
       potencia_kva: input.potencia_kva,
       tension_primaria_kv: input.tension_primaria_kv,
-      tension_secundaria_kv: input.tension_secundaria_kv,
+      tension_secundaria_v: input.tension_secundaria_v,
       fases: input.fases,
       fabricante: input.fabricante ?? null,
       numero_serie: input.numero_serie ?? null,
@@ -37,7 +31,6 @@ export async function crearTransformador(input: NuevoTransformadorInput) {
     .single();
 
   if (errTransformador) {
-    // rollback manual del elemento creado
     await supabase.from("elementos").delete().eq("id", elemento.id);
     throw errTransformador;
   }
