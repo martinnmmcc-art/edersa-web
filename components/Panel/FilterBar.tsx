@@ -14,8 +14,13 @@ interface FilterBarProps {
 const TODOS_LOS_TIPOS: TipoElemento[] = [
   "reconectador",
   "seccionador",
+  "cuchilla",
   "omnirouter",
   "transformador",
+  "capacitor",
+  "central_termica",
+  "barra",
+  "generador",
 ];
 
 export function FilterBar({
