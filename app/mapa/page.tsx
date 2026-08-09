@@ -1,7 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { MapView } from "@/components/Map/MapView";
+import { useMemo, useState, useEffect } from "react";
+
+// 🔥 FIX ACA (SIN {})
+import MapView from "@/components/Map/MapView";
+
 import { FilterBar } from "@/components/Panel/FilterBar";
 import { EventPanel } from "@/components/Panel/EventPanel";
 import { SyncStatus } from "@/components/UI/SyncStatus";
@@ -11,7 +14,7 @@ import { useElementosEstado } from "@/hooks/useElementosEstado";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { useUsuarioLocal } from "@/hooks/useUsuarioLocal";
 import { obtenerAlimentadores } from "@/services/elementosService";
-import { useEffect } from "react";
+
 import type { Alimentador, ElementoEstado, TipoElemento } from "@/types";
 
 const TODOS_LOS_TIPOS: TipoElemento[] = [
@@ -50,7 +53,7 @@ export default function MapaPage() {
     obtenerAlimentadores()
       .then((data) => setAlimentadores(data as Alimentador[]))
       .catch(() => {
-        /* si falla (ej. offline), simplemente no se muestran filtros por alimentador */
+        // modo offline, ignoramos error
       });
   }, []);
 
@@ -119,7 +122,11 @@ export default function MapaPage() {
         {modoAltaElemento ? "Tocá el mapa…" : "+ Elemento"}
       </button>
 
-      <SyncStatus online={online} pendientes={pendientes} sincronizando={sincronizando} />
+      <SyncStatus
+        online={online}
+        pendientes={pendientes}
+        sincronizando={sincronizando}
+      />
 
       {elementoSeleccionado && (
         <EventPanel
