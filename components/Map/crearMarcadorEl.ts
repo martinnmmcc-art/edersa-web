@@ -1,21 +1,20 @@
 import { COLOR_ESTADO, ICONO_TIPO } from "@/lib/estado";
 import type { ElementoEstado } from "@/types";
 
-/**
- * Construye el <div> que MapLibre usa como marcador custom: el círculo
- * de color/glifo (estado + tipo) y, debajo, una etiqueta con el nombre
- * o código real del equipo. En campo se trabaja por ID (ej: "SEC-14"),
- * no por la letra del glifo, así que el texto tiene que estar siempre
- * visible, sin necesidad de tocar el marcador.
- */
 export function crearMarcadorEl(elemento: ElementoEstado, seleccionado: boolean) {
   const tamaño = seleccionado ? 40 : 32;
 
-  const contenedor = document.createElement("div");
-  contenedor.style.position = "relative";
-  contenedor.style.width = `${tamaño}px`;
-  contenedor.style.height = `${tamaño}px`;
-  contenedor.style.cursor = "pointer";
+  // Raíz: esta es la que recibe MapLibre. Sin `position` inline.
+  const raiz = document.createElement("div");
+  raiz.style.width = `${tamaño}px`;
+  raiz.style.height = `${tamaño}px`;
+  raiz.style.cursor = "pointer";
+
+  // Wrapper interno: acá sí position:relative, MapLibre nunca lo toca.
+  const wrapper = document.createElement("div");
+  wrapper.style.position = "relative";
+  wrapper.style.width = "100%";
+  wrapper.style.height = "100%";
 
   const circulo = document.createElement("div");
   circulo.style.width = `${tamaño}px`;
@@ -53,13 +52,14 @@ export function crearMarcadorEl(elemento: ElementoEstado, seleccionado: boolean)
   etiqueta.style.textOverflow = "ellipsis";
   etiqueta.style.pointerEvents = "none";
 
-  contenedor.appendChild(circulo);
-  contenedor.appendChild(etiqueta);
+  wrapper.appendChild(circulo);
+  wrapper.appendChild(etiqueta);
+  raiz.appendChild(wrapper);
 
-  contenedor.setAttribute("role", "button");
-  contenedor.setAttribute(
+  raiz.setAttribute("role", "button");
+  raiz.setAttribute(
     "aria-label",
     `${elemento.nombre}, ${elemento.tipo}, estado ${elemento.estado}`
   );
-  return contenedor;
+  return raiz;
 }
