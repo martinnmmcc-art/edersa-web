@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { nombreCanalUnico } from "@/lib/realtimeChannel";
 import type { SalidaBTEstado } from "@/types";
 
 export async function obtenerSalidasBTDeTransformador(
@@ -41,7 +42,7 @@ export async function crearSalidaBT(
 
 export function suscribirseASalidasBT(onCambio: () => void) {
   const canal = supabase
-    .channel("salidas-bt-realtime")
+    .channel(nombreCanalUnico("salidas-bt-realtime"))
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "salidas_bt" },
