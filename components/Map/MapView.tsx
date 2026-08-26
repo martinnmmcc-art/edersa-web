@@ -20,6 +20,7 @@ interface MapViewProps {
 }
 
 const CONTAINER_ID = "edersa-map-container";
+const CAPAS_HITBOX = [`${CAPA_MT}-hitbox`, `${CAPA_BT}-hitbox`];
 
 export function MapView({
   elementos,
@@ -36,59 +37,74 @@ export function MapView({
   const marcadoresRef = useRef<Map<string, maplibregl.Marker>>(new Map());
   const tramosRef = useRef<TramoLinea[]>([]);
   const puntosTrazadoRef = useRef<[number, number][]>([]);
+  const onSeleccionarTramoRef = useRef(onSeleccionarTramo);
+  const onClickMapaRef = useRef(onClickMapa);
 
+  // Refs para los callbacks: así el listener de click se registra UNA
+  // sola vez (no cada vez que el padre re-renderiza y pasa una función
+  // nueva) y siempre usa la versión más reciente igual.
   useEffect(() => {
-    if (!map || !mapListo || !onClickMapa) return;
+    onSeleccionarTramoRef.current = onSeleccionarTramo;
+    onClickMapaRef.current = onClickMapa;
+  }, [onSeleccionarTramo, onClickMapa]);
+
+  // Un único listener de click para todo el mapa: primero pregunta si el
+  // toque cayó sobre un tramo (solo si esas capas ya existen — pedirle a
+  // MapLibre features de una capa que no existe todavía tira una
+  // excepción real, no un error controlado, y eso es lo que rompía la
+  // app) y si no, lo trata como un click genérico sobre el mapa.
+  useEffect(() => {
+    if (!map || !mapListo) return;
+
     const handler = (e: maplibregl.MapMouseEvent) => {
-      onClickMapa({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+      const capasListas = CAPAS_HITBOX.filter((c) => map.getLayer(c));
+
+      if (capasListas.length > 0 && onSeleccionarTramoRef.current) {
+        let features: maplibregl.MapGeoJSONFeature[] = [];
+        try {
+          features = map.queryRenderedFeatures(e.point, { layers: capasListas });
+        } catch {
+          features = [];
+        }
+        const feature = features[0];
+        if (feature) {
+          onSeleccionarTramoRef.current({
+            id: String(feature.properties?.id ?? ""),
+            nombre: String(feature.properties?.nombre ?? ""),
+            tension: String(feature.properties?.tension ?? "MT"),
+            alimentador_id: String(feature.properties?.alimentador_id ?? ""),
+            alimentador_id_b: String(feature.properties?.alimentador_id_b ?? ""),
+            elemento_frontera_id: String(feature.properties?.elemento_frontera_id ?? ""),
+          });
+          return;
+        }
+      }
+
+      onClickMapaRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
     };
+
+    const moverMouse = (e: maplibregl.MapMouseEvent) => {
+      const capasListas = CAPAS_HITBOX.filter((c) => map.getLayer(c));
+      if (capasListas.length === 0) {
+        map.getCanvas().style.cursor = "";
+        return;
+      }
+      let hay = false;
+      try {
+        hay = map.queryRenderedFeatures(e.point, { layers: capasListas }).length > 0;
+      } catch {
+        hay = false;
+      }
+      map.getCanvas().style.cursor = hay ? "pointer" : "";
+    };
+
     map.on("click", handler);
+    map.on("mousemove", moverMouse);
     return () => {
       map.off("click", handler);
+      map.off("mousemove", moverMouse);
     };
-  }, [map, mapListo, onClickMapa]);
-
-  // Click sobre un tramo (línea MT/BT) -> avisa al padre cuál se tocó.
-  // Se engancha sobre los "hitbox" (más anchos, invisibles) para que sea
-  // fácil tocarlo con el dedo; el mapa de todas formas también dispara
-  // el click genérico de arriba, así que en el padre hay que ignorar
-  // ese click cuando cae sobre un tramo (se corta la propagación acá).
-  useEffect(() => {
-    if (!map || !mapListo || !onSeleccionarTramo) return;
-
-    const capas = [`${CAPA_MT}-hitbox`, `${CAPA_BT}-hitbox`];
-
-    const handler = (e: maplibregl.MapLayerMouseEvent) => {
-      const feature = e.features?.[0];
-      if (!feature) return;
-      e.preventDefault();
-      onSeleccionarTramo({
-        id: String(feature.properties?.id ?? ""),
-        nombre: String(feature.properties?.nombre ?? ""),
-        tension: String(feature.properties?.tension ?? "MT"),
-        alimentador_id: String(feature.properties?.alimentador_id ?? ""),
-        alimentador_id_b: String(feature.properties?.alimentador_id_b ?? ""),
-        elemento_frontera_id: String(feature.properties?.elemento_frontera_id ?? ""),
-      });
-    };
-
-    const entrar = () => (map.getCanvas().style.cursor = "pointer");
-    const salir = () => (map.getCanvas().style.cursor = "");
-
-    capas.forEach((c) => {
-      map.on("click", c, handler);
-      map.on("mouseenter", c, entrar);
-      map.on("mouseleave", c, salir);
-    });
-
-    return () => {
-      capas.forEach((c) => {
-        map.off("click", c, handler);
-        map.off("mouseenter", c, entrar);
-        map.off("mouseleave", c, salir);
-      });
-    };
-  }, [map, mapListo, onSeleccionarTramo]);
+  }, [map, mapListo]);
 
   // Sincroniza los marcadores con la lista de elementos.
   useEffect(() => {
@@ -116,8 +132,7 @@ export function MapView({
       el.onclick = (ev) => {
         // Evita que el toque sobre el marcador también le llegue al mapa
         // (que en modo trazado/alta interpretaría el mismo toque como un
-        // click sobre el mapa vacío). Sin esto, tocar un elemento
-        // mientras estás trazando dispara las dos acciones a la vez.
+        // click sobre el mapa vacío).
         ev.stopPropagation();
         onSeleccionarElemento(elemento);
       };
