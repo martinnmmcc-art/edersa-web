@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { nombreCanalUnico } from "@/lib/realtimeChannel";
 import type { NuevoTramoInput, TramoLinea } from "@/types";
 
 export async function obtenerTramos(): Promise<TramoLinea[]> {
@@ -53,7 +54,7 @@ export async function darDeBajaTramo(id: string) {
 
 export function suscribirseATramos(onCambio: () => void) {
   const canal = supabase
-    .channel("tramos-realtime")
+    .channel(nombreCanalUnico("tramos-realtime"))
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "tramos_linea" },
