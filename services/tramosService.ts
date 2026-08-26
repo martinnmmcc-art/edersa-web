@@ -28,6 +28,22 @@ export async function crearTramo(input: NuevoTramoInput) {
   return data;
 }
 
+export async function actualizarTramo(
+  id: string,
+  cambios: { alimentador_id?: string | null; nombre?: string | null }
+) {
+  const { error } = await supabase.from("tramos_linea").update(cambios).eq("id", id);
+  if (error) throw error;
+}
+
+export async function darDeBajaTramo(id: string) {
+  const { error } = await supabase
+    .from("tramos_linea")
+    .update({ activo: false })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export function suscribirseATramos(onCambio: () => void) {
   const canal = supabase
     .channel("tramos-realtime")

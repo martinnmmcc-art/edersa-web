@@ -5,7 +5,8 @@ import maplibregl from "maplibre-gl";
 import { useMap } from "@/hooks/useMap";
 import { crearMarcadorEl } from "./crearMarcadorEl";
 import { SelectorEstiloMapa } from "./SelectorEstiloMapa";
-import { dibujarTramos, dibujarPreviewTrazado } from "@/lib/tramosLayer";
+import { dibujarTramos, dibujarPreviewTrazado, CAPA_MT, CAPA_BT } from "@/lib/tramosLayer";
+import type { TramoSeleccionado } from "./TramoInfoPanel";
 import type { ElementoEstado, TramoLinea } from "@/types";
 
 interface MapViewProps {
@@ -15,6 +16,7 @@ interface MapViewProps {
   onClickMapa?: (coords: { lat: number; lng: number }) => void;
   tramos?: TramoLinea[];
   puntosTrazado?: [number, number][];
+  onSeleccionarTramo?: (tramo: TramoSeleccionado) => void;
 }
 
 const CONTAINER_ID = "edersa-map-container";
@@ -26,6 +28,7 @@ export function MapView({
   onClickMapa,
   tramos = [],
   puntosTrazado = [],
+  onSeleccionarTramo,
 }: MapViewProps) {
   const { map, mapListo, errorMapa, modoMapa, cambiarModoMapa } = useMap({
     containerId: CONTAINER_ID,
@@ -44,6 +47,46 @@ export function MapView({
       map.off("click", handler);
     };
   }, [map, mapListo, onClickMapa]);
+
+  // Click sobre un tramo (línea MT/BT) -> avisa al padre cuál se tocó.
+  // Se engancha sobre los "hitbox" (más anchos, invisibles) para que sea
+  // fácil tocarlo con el dedo; el mapa de todas formas también dispara
+  // el click genérico de arriba, así que en el padre hay que ignorar
+  // ese click cuando cae sobre un tramo (se corta la propagación acá).
+  useEffect(() => {
+    if (!map || !mapListo || !onSeleccionarTramo) return;
+
+    const capas = [`${CAPA_MT}-hitbox`, `${CAPA_BT}-hitbox`];
+
+    const handler = (e: maplibregl.MapLayerMouseEvent) => {
+      const feature = e.features?.[0];
+      if (!feature) return;
+      e.preventDefault();
+      onSeleccionarTramo({
+        id: String(feature.properties?.id ?? ""),
+        nombre: String(feature.properties?.nombre ?? ""),
+        tension: String(feature.properties?.tension ?? "MT"),
+        alimentador_id: String(feature.properties?.alimentador_id ?? ""),
+      });
+    };
+
+    const entrar = () => (map.getCanvas().style.cursor = "pointer");
+    const salir = () => (map.getCanvas().style.cursor = "");
+
+    capas.forEach((c) => {
+      map.on("click", c, handler);
+      map.on("mouseenter", c, entrar);
+      map.on("mouseleave", c, salir);
+    });
+
+    return () => {
+      capas.forEach((c) => {
+        map.off("click", c, handler);
+        map.off("mouseenter", c, entrar);
+        map.off("mouseleave", c, salir);
+      });
+    };
+  }, [map, mapListo, onSeleccionarTramo]);
 
   // Sincroniza los marcadores con la lista de elementos.
   useEffect(() => {
@@ -79,24 +122,18 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, mapListo, elementos, elementoSeleccionadoId]);
 
-  // Dibuja/actualiza los tramos guardados (MT siempre, BT según zoom).
   useEffect(() => {
     tramosRef.current = tramos;
     if (!map || !mapListo) return;
     dibujarTramos(map, tramos);
   }, [map, mapListo, tramos]);
 
-  // Dibuja/actualiza la línea "en construcción" del modo trazado.
   useEffect(() => {
     puntosTrazadoRef.current = puntosTrazado;
     if (!map || !mapListo) return;
     dibujarPreviewTrazado(map, puntosTrazado);
   }, [map, mapListo, puntosTrazado]);
 
-  // IMPORTANTE: cambiar de estilo (calles/satélite/etc) borra las fuentes
-  // y capas custom que agregamos (a diferencia de los Marker, que son DOM
-  // aparte y sobreviven solos). Por eso hay que re-agregar tramos y
-  // preview cada vez que termina de cargar un estilo nuevo.
   useEffect(() => {
     if (!map) return;
     const reagregar = () => {

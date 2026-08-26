@@ -13,6 +13,7 @@ const MOTIVOS: { valor: TipoMotivo; label: string }[] = [
   { valor: "mantenimiento", label: "Mantenimiento" },
   { valor: "poda", label: "Poda" },
   { valor: "falla", label: "Falla" },
+  { valor: "transferencia_carga", label: "Transferencia de carga" },
   { valor: "otro", label: "Otro" },
 ];
 

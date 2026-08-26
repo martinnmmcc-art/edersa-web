@@ -32,6 +32,8 @@ export interface ElementoEstado {
   alimentador_id: string | null;
   alimentador_nombre: string | null;
   tension_kv: number | null;
+  alimentador_id_b: string | null;
+  alimentador_b_nombre: string | null;
   lat: number;
   lng: number;
   codigo: string | null;
@@ -125,6 +127,7 @@ export interface NuevoElementoInput {
   nombre: string;
   tipo: TipoElemento;
   alimentador_id: string | null;
+  alimentador_id_b?: string | null;
   lat: number;
   lng: number;
   codigo?: string;
@@ -134,11 +137,18 @@ export interface ActualizarElementoInput {
   id: string;
   nombre: string;
   alimentador_id: string | null;
+  alimentador_id_b?: string | null;
 }
 
 export type ModoMapa = "calles" | "satelite" | "hibrida" | "topografico";
 
-export type TipoMotivo = "poda" | "mantenimiento" | "preventivo" | "falla" | "otro";
+export type TipoMotivo =
+  | "poda"
+  | "mantenimiento"
+  | "preventivo"
+  | "falla"
+  | "transferencia_carga"
+  | "otro";
 
 export interface SalidaBTEstado {
   id: string;

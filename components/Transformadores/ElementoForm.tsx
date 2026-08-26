@@ -48,6 +48,7 @@ export function ElementoForm({
     const lng = Number(form.get("lng"));
     const nombre = String(form.get("nombre") || "").trim();
     const alimentador_id = (form.get("alimentador_id") as string) || null;
+    const alimentador_id_b = (form.get("alimentador_id_b") as string) || null;
 
     if (Number.isNaN(lat) || Number.isNaN(lng)) {
       setErrorMsg("Ubicación inválida. Tocá el mapa para fijar el punto.");
@@ -94,7 +95,7 @@ export function ElementoForm({
           tension_salida_kv: Number(form.get("tension_salida_kv")),
         });
       } else {
-        await crearElemento({ nombre, tipo, alimentador_id, lat, lng });
+        await crearElemento({ nombre, tipo, alimentador_id, alimentador_id_b, lat, lng });
       }
       onCreado();
       onCerrar();
@@ -157,6 +158,22 @@ export function ElementoForm({
               ))}
             </select>
           </Campo>
+
+          {tipo === "omnirouter" && (
+            <Campo label="Segundo alimentador (si anilla / transfiere carga)">
+              <select name="alimentador_id_b" className="campo-input">
+                <option value="">No anilla — un solo alimentador</option>
+                {alimentadores.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nombre} ({a.tension_kv}kV)
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-slate-500 mt-1">
+                Ej: el omnirouter Islas Malvinas anilla Alim. Sur ↔ Alim. Norte.
+              </span>
+            </Campo>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <Campo label="Latitud">

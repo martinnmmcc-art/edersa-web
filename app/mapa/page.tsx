@@ -8,6 +8,7 @@ import { SyncStatus } from "@/components/UI/SyncStatus";
 import { IdentificacionOperario } from "@/components/UI/IdentificacionOperario";
 import { ElementoForm } from "@/components/Transformadores/ElementoForm";
 import { TramoForm } from "@/components/Map/TramoForm";
+import { TramoInfoPanel, type TramoSeleccionado } from "@/components/Map/TramoInfoPanel";
 import { AlertasPanel } from "@/components/Panel/AlertasPanel";
 import { HistorialPanel } from "@/components/Panel/HistorialPanel";
 import { useElementosEstado } from "@/hooks/useElementosEstado";
@@ -55,6 +56,11 @@ export default function MapaPage() {
   const [puntosTrazado, setPuntosTrazado] = useState<[number, number][]>([]);
   const [mostrarFormTramo, setMostrarFormTramo] = useState(false);
 
+  // --- Tramo tocado en el mapa (para ver/editar su alimentador) ---
+  const [tramoSeleccionado, setTramoSeleccionado] = useState<TramoSeleccionado | null>(
+    null
+  );
+
   useEffect(() => {
     obtenerAlimentadores()
       .then((data) => setAlimentadores(data as Alimentador[]))
@@ -93,6 +99,15 @@ export default function MapaPage() {
     }
   }
 
+  // Si estás en modo alta/trazado y tocás justo sobre un tramo existente,
+  // priorizamos la acción del modo activo (agregar punto / ubicar
+  // elemento) en vez de abrir la info del tramo — evita el conflicto de
+  // que se abran los dos paneles a la vez.
+  function handleSeleccionarTramo(tramo: TramoSeleccionado) {
+    if (modoAltaElemento || modoTrazado) return;
+    setTramoSeleccionado(tramo);
+  }
+
   function handleActivarTrazado() {
     setModoTrazado(true);
     setPuntosTrazado([]);
@@ -123,6 +138,7 @@ export default function MapaPage() {
         onClickMapa={handleClickMapa}
         tramos={tramos}
         puntosTrazado={puntosTrazado}
+        onSeleccionarTramo={handleSeleccionarTramo}
       />
 
       <FilterBar
@@ -139,56 +155,61 @@ export default function MapaPage() {
         </div>
       )}
 
-      {/* Botón flotante: alta de elemento */}
+      {/* Botones flotantes de modo, apilados verticalmente para que no se
+          pisen entre sí en pantallas angostas. */}
       {!modoTrazado && (
-        <button
-          onClick={() => setModoAltaElemento((v) => !v)}
-          className={`fixed bottom-4 left-4 z-20 h-touch px-4 rounded-full font-semibold shadow-lg transition ${
-            modoAltaElemento
-              ? "bg-acento text-panel"
-              : "bg-panel-raised border border-panel-border text-slate-200"
-          }`}
-        >
-          {modoAltaElemento ? "Tocá el mapa…" : "+ Elemento"}
-        </button>
-      )}
-
-      {/* Botón flotante: trazar línea (se reemplaza por la barra de control mientras se traza) */}
-      {!modoTrazado && !modoAltaElemento && (
-        <button
-          onClick={handleActivarTrazado}
-          className="fixed bottom-4 left-32 z-20 h-touch px-4 rounded-full font-semibold shadow-lg bg-panel-raised border border-panel-border text-slate-200"
-        >
-          🖊 Trazar línea
-        </button>
+        <div className="fixed bottom-4 left-4 z-20 flex flex-col gap-2 items-start">
+          <button
+            onClick={handleActivarTrazado}
+            className="h-touch px-4 rounded-full font-semibold shadow-lg bg-panel-raised border border-panel-border text-slate-200"
+          >
+            🖊 Trazar línea
+          </button>
+          <button
+            onClick={() => setModoAltaElemento((v) => !v)}
+            className={`h-touch px-4 rounded-full font-semibold shadow-lg transition ${
+              modoAltaElemento
+                ? "bg-acento text-panel"
+                : "bg-panel-raised border border-panel-border text-slate-200"
+            }`}
+          >
+            {modoAltaElemento ? "Tocá el mapa…" : "+ Elemento"}
+          </button>
+        </div>
       )}
 
       {/* Barra de control del trazado en curso */}
       {modoTrazado && (
-        <div className="fixed bottom-4 inset-x-4 z-20 bg-panel-raised border border-panel-border rounded-xl shadow-lg p-3 flex items-center gap-2">
-          <span className="text-sm text-slate-300 flex-1">
-            {puntosTrazado.length} punto{puntosTrazado.length !== 1 ? "s" : ""} · tocá el mapa para agregar
-          </span>
-          <button
-            onClick={handleDeshacerPunto}
-            disabled={puntosTrazado.length === 0}
-            className="h-9 px-3 rounded-lg border border-panel-border text-slate-300 text-sm disabled:opacity-40"
-          >
-            Deshacer
-          </button>
-          <button
-            onClick={handleCancelarTrazado}
-            className="h-9 px-3 rounded-lg border border-estado-abierto text-estado-abierto text-sm"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={() => setMostrarFormTramo(true)}
-            disabled={puntosTrazado.length < 2}
-            className="h-9 px-3 rounded-lg bg-acento text-panel font-semibold text-sm disabled:opacity-40"
-          >
-            Guardar
-          </button>
+        <div className="fixed bottom-4 inset-x-4 z-20 bg-panel-raised border border-panel-border rounded-xl shadow-lg p-3">
+          <p className="text-sm text-slate-300 mb-2">
+            {puntosTrazado.length === 0
+              ? "Tocá el mapa para marcar el primer punto del tramo."
+              : `${puntosTrazado.length} punto${puntosTrazado.length !== 1 ? "s" : ""} marcado${
+                  puntosTrazado.length !== 1 ? "s" : ""
+                } · seguí tocando para agregar más`}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDeshacerPunto}
+              disabled={puntosTrazado.length === 0}
+              className="h-9 px-3 rounded-lg border border-panel-border text-slate-300 text-sm disabled:opacity-40"
+            >
+              Deshacer
+            </button>
+            <button
+              onClick={handleCancelarTrazado}
+              className="h-9 px-3 rounded-lg border border-estado-abierto text-estado-abierto text-sm"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => setMostrarFormTramo(true)}
+              disabled={puntosTrazado.length < 2}
+              className="h-9 px-3 rounded-lg bg-acento text-panel font-semibold text-sm disabled:opacity-40 flex-1"
+            >
+              Guardar tramo
+            </button>
+          </div>
         </div>
       )}
 
@@ -229,6 +250,15 @@ export default function MapaPage() {
             setModoTrazado(false);
             setPuntosTrazado([]);
           }}
+        />
+      )}
+
+      {tramoSeleccionado && (
+        <TramoInfoPanel
+          tramo={tramoSeleccionado}
+          alimentadores={alimentadores}
+          onCerrar={() => setTramoSeleccionado(null)}
+          onActualizado={() => recargarTramos()}
         />
       )}
     </main>

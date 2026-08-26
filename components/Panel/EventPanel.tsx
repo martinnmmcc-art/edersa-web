@@ -15,6 +15,7 @@ const MOTIVOS: { valor: TipoMotivo; label: string }[] = [
   { valor: "mantenimiento", label: "Mantenimiento" },
   { valor: "poda", label: "Poda" },
   { valor: "falla", label: "Falla" },
+  { valor: "transferencia_carga", label: "Transferencia de carga" },
   { valor: "otro", label: "Otro" },
 ];
 
@@ -60,11 +61,12 @@ export function EventPanel({
     const form = new FormData(e.currentTarget);
     const nombre = String(form.get("nombre") || "").trim();
     const alimentador_id = (form.get("alimentador_id") as string) || null;
+    const alimentador_id_b = (form.get("alimentador_id_b") as string) || null;
     if (nombre.length < 2) return;
 
     setGuardandoEdicion(true);
     try {
-      await actualizarElemento(elemento.id, { nombre, alimentador_id });
+      await actualizarElemento(elemento.id, { nombre, alimentador_id, alimentador_id_b });
       onEventoRegistrado(false);
       onCerrarPanel();
     } finally {
@@ -118,6 +120,24 @@ export function EventPanel({
               ))}
             </select>
           </label>
+
+          {elemento.tipo === "omnirouter" && (
+            <label className="flex flex-col gap-1 text-sm text-slate-300">
+              Segundo alimentador (si anilla / transfiere carga)
+              <select
+                name="alimentador_id_b"
+                defaultValue={elemento.alimentador_id_b ?? ""}
+                className="campo-input"
+              >
+                <option value="">No anilla — un solo alimentador</option>
+                {alimentadores.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nombre} ({a.tension_kv}kV)
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <div className="flex gap-3 mt-1">
             <button
@@ -188,6 +208,11 @@ export function EventPanel({
               {elemento.alimentador_nombre ? ` · ${elemento.alimentador_nombre}` : ""}
             </p>
             <h2 className="font-display text-2xl leading-tight">{elemento.nombre}</h2>
+            {elemento.alimentador_b_nombre && (
+              <p className="text-xs mt-1 text-acento font-semibold">
+                🔗 Anilla: {elemento.alimentador_nombre} ↔ {elemento.alimentador_b_nombre}
+              </p>
+            )}
             {!TIPOS_SIN_MANIOBRA.has(elemento.tipo) && (
               <p
                 className="text-sm mt-1 font-semibold"
