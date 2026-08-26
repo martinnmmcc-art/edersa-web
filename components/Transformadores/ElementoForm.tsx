@@ -49,6 +49,7 @@ export function ElementoForm({
     const nombre = String(form.get("nombre") || "").trim();
     const alimentador_id = (form.get("alimentador_id") as string) || null;
     const alimentador_id_b = (form.get("alimentador_id_b") as string) || null;
+    const es_fuente = form.get("es_fuente") === "on";
 
     if (Number.isNaN(lat) || Number.isNaN(lng)) {
       setErrorMsg("Ubicación inválida. Tocá el mapa para fijar el punto.");
@@ -95,7 +96,7 @@ export function ElementoForm({
           tension_salida_kv: Number(form.get("tension_salida_kv")),
         });
       } else {
-        await crearElemento({ nombre, tipo, alimentador_id, alimentador_id_b, lat, lng });
+        await crearElemento({ nombre, tipo, alimentador_id, alimentador_id_b, es_fuente, lat, lng });
       }
       onCreado();
       onCerrar();
@@ -158,6 +159,16 @@ export function ElementoForm({
               ))}
             </select>
           </Campo>
+
+          <label className="flex items-center gap-2 text-sm text-slate-300">
+            <input type="checkbox" name="es_fuente" className="w-5 h-5" />
+            Es un punto de alimentación (fuente de energía)
+          </label>
+          <span className="text-xs text-slate-500 -mt-2">
+            Desde acá arranca la tensión en el mapa de energización — ej: la
+            barra, la central térmica, o el reconectador de cabecera de un
+            alimentador (Sur, Norte, etc).
+          </span>
 
           {tipo === "omnirouter" && (
             <Campo label="Segundo alimentador (si anilla / transfiere carga)">

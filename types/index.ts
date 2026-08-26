@@ -34,6 +34,7 @@ export interface ElementoEstado {
   tension_kv: number | null;
   alimentador_id_b: string | null;
   alimentador_b_nombre: string | null;
+  es_fuente: boolean;
   lat: number;
   lng: number;
   codigo: string | null;
@@ -128,6 +129,7 @@ export interface NuevoElementoInput {
   tipo: TipoElemento;
   alimentador_id: string | null;
   alimentador_id_b?: string | null;
+  es_fuente?: boolean;
   lat: number;
   lng: number;
   codigo?: string;
@@ -138,6 +140,7 @@ export interface ActualizarElementoInput {
   nombre: string;
   alimentador_id: string | null;
   alimentador_id_b?: string | null;
+  es_fuente?: boolean;
 }
 
 export type ModoMapa = "calles" | "satelite" | "hibrida" | "topografico";

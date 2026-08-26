@@ -1,7 +1,13 @@
 import { COLOR_ESTADO, ICONO_TIPO } from "@/lib/estado";
 import type { ElementoEstado } from "@/types";
 
-export function crearMarcadorEl(elemento: ElementoEstado, seleccionado: boolean) {
+const COLOR_SIN_TENSION = "#6b7280"; // gris — no le llega energía desde ninguna fuente
+
+export function crearMarcadorEl(
+  elemento: ElementoEstado,
+  seleccionado: boolean,
+  energizado: boolean = true
+) {
   const tamaño = seleccionado ? 40 : 32;
 
   const raiz = document.createElement("div");
@@ -25,9 +31,14 @@ export function crearMarcadorEl(elemento: ElementoEstado, seleccionado: boolean)
   circulo.style.fontFamily = "'Barlow Condensed', sans-serif";
   circulo.style.fontSize = seleccionado ? "16px" : "14px";
   circulo.style.color = "#0b0f14";
-  circulo.style.background = COLOR_ESTADO[elemento.estado];
+  // Si no le llega tensión, gris manda por encima del verde/rojo — es
+  // el dato operativo más importante en ese momento.
+  circulo.style.background = energizado ? COLOR_ESTADO[elemento.estado] : COLOR_SIN_TENSION;
   circulo.style.border = seleccionado ? "3px solid #ffb100" : "2px solid #0b0f14";
   circulo.style.boxShadow = "0 2px 6px rgba(0,0,0,0.5)";
+  if (!energizado) {
+    circulo.style.opacity = "0.55";
+  }
   circulo.textContent = ICONO_TIPO[elemento.tipo];
 
   const etiqueta = document.createElement("div");
@@ -57,7 +68,9 @@ export function crearMarcadorEl(elemento: ElementoEstado, seleccionado: boolean)
   raiz.setAttribute("role", "button");
   raiz.setAttribute(
     "aria-label",
-    `${elemento.nombre}, ${elemento.tipo}, estado ${elemento.estado}`
+    `${elemento.nombre}, ${elemento.tipo}, estado ${elemento.estado}${
+      energizado ? "" : ", sin tensión"
+    }`
   );
   return raiz;
 }

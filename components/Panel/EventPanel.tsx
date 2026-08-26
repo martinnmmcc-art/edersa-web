@@ -62,11 +62,12 @@ export function EventPanel({
     const nombre = String(form.get("nombre") || "").trim();
     const alimentador_id = (form.get("alimentador_id") as string) || null;
     const alimentador_id_b = (form.get("alimentador_id_b") as string) || null;
+    const es_fuente = form.get("es_fuente") === "on";
     if (nombre.length < 2) return;
 
     setGuardandoEdicion(true);
     try {
-      await actualizarElemento(elemento.id, { nombre, alimentador_id, alimentador_id_b });
+      await actualizarElemento(elemento.id, { nombre, alimentador_id, alimentador_id_b, es_fuente });
       onEventoRegistrado(false);
       onCerrarPanel();
     } finally {
@@ -119,6 +120,16 @@ export function EventPanel({
                 </option>
               ))}
             </select>
+          </label>
+
+          <label className="flex items-center gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              name="es_fuente"
+              defaultChecked={elemento.es_fuente}
+              className="w-5 h-5"
+            />
+            Es un punto de alimentación (fuente de energía)
           </label>
 
           {elemento.tipo === "omnirouter" && (
@@ -208,6 +219,11 @@ export function EventPanel({
               {elemento.alimentador_nombre ? ` · ${elemento.alimentador_nombre}` : ""}
             </p>
             <h2 className="font-display text-2xl leading-tight">{elemento.nombre}</h2>
+            {elemento.es_fuente && (
+              <p className="text-xs mt-1 text-estado-cerrado font-semibold">
+                ⚡ Punto de alimentación (fuente)
+              </p>
+            )}
             {elemento.alimentador_b_nombre && (
               <p className="text-xs mt-1 text-acento font-semibold">
                 🔗 Anilla: {elemento.alimentador_nombre} ↔ {elemento.alimentador_b_nombre}

@@ -18,6 +18,7 @@ import { useTramos } from "@/hooks/useTramos";
 import { obtenerAlimentadores } from "@/services/elementosService";
 import { buscarPuntoCercano } from "@/lib/geo";
 import { resolverColorTramo } from "@/lib/anillado";
+import { calcularEnergizacion } from "@/lib/energizacion";
 import type { Alimentador, ElementoEstado, TipoElemento } from "@/types";
 
 const TODOS_LOS_TIPOS: TipoElemento[] = [
@@ -86,12 +87,19 @@ export default function MapaPage() {
   // Tramos con el color ya resuelto (según alimentador y estado de
   // anillo en vivo) — esto es lo único que se le pasa al mapa para
   // dibujar; el resto de los datos del tramo quedan intactos.
+  const energizacion = useMemo(
+    () => calcularEnergizacion(tramos, elementos),
+    [tramos, elementos]
+  );
+
   const tramosParaMapa = useMemo(() => {
     return tramos.map((t) => ({
       ...t,
-      color: resolverColorTramo(t, alimentadores, elementos),
+      color: energizacion.tramosEnergizados.has(t.id)
+        ? resolverColorTramo(t, alimentadores, elementos)
+        : "#6b7280", // gris: sin tensión, no le llega energía desde ninguna fuente
     }));
-  }, [tramos, alimentadores, elementos]);
+  }, [tramos, alimentadores, elementos, energizacion]);
 
   // Todos los puntos "enganchables": la ubicación de cada elemento
   // activo + cada vértice de cada tramo ya trazado.
@@ -169,6 +177,7 @@ export default function MapaPage() {
         tramos={tramosParaMapa}
         puntosTrazado={puntosTrazado}
         onSeleccionarTramo={handleSeleccionarTramo}
+        elementosEnergizadosIds={energizacion.elementosEnergizados}
       />
 
       <FilterBar

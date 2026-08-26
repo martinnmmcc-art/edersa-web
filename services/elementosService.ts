@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { nombreCanalUnico } from "@/lib/realtimeChannel";
 import type { ElementoEstado } from "@/types";
 
 export async function obtenerElementosConEstado(): Promise<ElementoEstado[]> {
@@ -24,7 +25,7 @@ export async function obtenerAlimentadores() {
 
 export function suscribirseAEventos(onCambio: () => void) {
   const canal = supabase
-    .channel("eventos-realtime")
+    .channel(nombreCanalUnico("eventos-realtime"))
     .on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "eventos" },
@@ -52,6 +53,7 @@ export async function crearElemento(input: {
   tipo: string;
   alimentador_id: string | null;
   alimentador_id_b?: string | null;
+  es_fuente?: boolean;
   lat: number;
   lng: number;
   codigo?: string;
@@ -63,6 +65,7 @@ export async function crearElemento(input: {
       tipo: input.tipo,
       alimentador_id: input.alimentador_id,
       alimentador_id_b: input.alimentador_id_b ?? null,
+      es_fuente: input.es_fuente ?? false,
       lat: input.lat,
       lng: input.lng,
       codigo: input.codigo,
@@ -76,7 +79,12 @@ export async function crearElemento(input: {
 
 export async function actualizarElemento(
   id: string,
-  cambios: { nombre?: string; alimentador_id?: string | null; alimentador_id_b?: string | null }
+  cambios: {
+    nombre?: string;
+    alimentador_id?: string | null;
+    alimentador_id_b?: string | null;
+    es_fuente?: boolean;
+  }
 ) {
   const { error } = await supabase.from("elementos").update(cambios).eq("id", id);
   if (error) throw error;
