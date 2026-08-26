@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { nombreCanalUnico } from "@/lib/realtimeChannel";
 import type { ElementoEstado } from "@/types";
 
 export async function obtenerElementosConEstado(): Promise<ElementoEstado[]> {
@@ -24,7 +25,7 @@ export async function obtenerAlimentadores() {
 
 export function suscribirseAEventos(onCambio: () => void) {
   const canal = supabase
-    .channel("eventos-realtime")
+    .channel(nombreCanalUnico("eventos-realtime"))
     .on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "eventos" },
