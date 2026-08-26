@@ -37,6 +37,7 @@ export interface ElementoEstado {
   codigo: string | null;
   activo: boolean;
   ultimo_evento_tipo: TipoEvento | null;
+  ultimo_evento_motivo: TipoMotivo | null;
   ultimo_evento_usuario: string | null;
   ultimo_evento_fecha: string | null;
   estado: EstadoElemento;
@@ -44,9 +45,11 @@ export interface ElementoEstado {
 
 export interface EventoInput {
   client_uuid: string;
-  elemento_id: string;
+  elemento_id?: string;
+  salida_bt_id?: string;
   tipo: TipoEvento;
   usuario: string;
+  motivo?: TipoMotivo;
   observaciones?: string;
   foto_url?: string;
   fecha: string;
@@ -134,3 +137,64 @@ export interface ActualizarElementoInput {
 }
 
 export type ModoMapa = "calles" | "satelite" | "hibrida" | "topografico";
+
+export type TipoMotivo = "poda" | "mantenimiento" | "preventivo" | "falla" | "otro";
+
+export interface SalidaBTEstado {
+  id: string;
+  transformador_id: string;
+  numero: number;
+  nombre: string | null;
+  transformador_elemento_id: string;
+  transformador_nombre: string;
+  ultimo_evento_tipo: TipoEvento | null;
+  ultimo_evento_motivo: TipoMotivo | null;
+  ultimo_evento_usuario: string | null;
+  ultimo_evento_fecha: string | null;
+  estado: EstadoElemento;
+}
+
+export interface ManiobraHistorial {
+  id: string;
+  tipo: TipoEvento;
+  motivo: TipoMotivo | null;
+  usuario: string;
+  observaciones: string | null;
+  fecha: string;
+  origen: string;
+  objetivo_tipo: "elemento" | "salida_bt";
+  objetivo_elemento_id: string;
+  objetivo_nombre: string;
+  objetivo_tipo_elemento: string;
+}
+
+export type Turno = "mañana" | "tarde" | "noche";
+
+export interface ResumenTurno {
+  clave: string;
+  fechaTurno: string;
+  turno: Turno;
+  total: number;
+  aperturas: number;
+  cierres: number;
+  porMotivo: Record<string, number>;
+}
+
+export type TensionTramo = "MT" | "BT";
+
+export interface TramoLinea {
+  id: string;
+  alimentador_id: string | null;
+  tension: TensionTramo;
+  nombre: string | null;
+  color: string | null;
+  puntos: [number, number][]; // [lng, lat][]
+}
+
+export interface NuevoTramoInput {
+  alimentador_id: string | null;
+  tension: TensionTramo;
+  nombre?: string;
+  color?: string;
+  puntos: [number, number][];
+}

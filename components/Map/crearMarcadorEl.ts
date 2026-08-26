@@ -4,13 +4,11 @@ import type { ElementoEstado } from "@/types";
 export function crearMarcadorEl(elemento: ElementoEstado, seleccionado: boolean) {
   const tamaño = seleccionado ? 40 : 32;
 
-  // Raíz: esta es la que recibe MapLibre. Sin `position` inline.
   const raiz = document.createElement("div");
   raiz.style.width = `${tamaño}px`;
   raiz.style.height = `${tamaño}px`;
   raiz.style.cursor = "pointer";
 
-  // Wrapper interno: acá sí position:relative, MapLibre nunca lo toca.
   const wrapper = document.createElement("div");
   wrapper.style.position = "relative";
   wrapper.style.width = "100%";

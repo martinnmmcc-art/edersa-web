@@ -7,7 +7,16 @@ import {
   darDeBajaElemento,
 } from "@/services/elementosService";
 import { COLOR_ESTADO, LABEL_ESTADO, LABEL_TIPO, TIPOS_SIN_MANIOBRA } from "@/lib/estado";
-import type { Alimentador, ElementoEstado } from "@/types";
+import { SalidasBTPanel } from "./SalidasBTPanel";
+import type { Alimentador, ElementoEstado, TipoMotivo } from "@/types";
+
+const MOTIVOS: { valor: TipoMotivo; label: string }[] = [
+  { valor: "preventivo", label: "Preventivo" },
+  { valor: "mantenimiento", label: "Mantenimiento" },
+  { valor: "poda", label: "Poda" },
+  { valor: "falla", label: "Falla" },
+  { valor: "otro", label: "Otro" },
+];
 
 interface EventPanelProps {
   elemento: ElementoEstado;
@@ -25,6 +34,7 @@ export function EventPanel({
   onEventoRegistrado,
 }: EventPanelProps) {
   const [enviando, setEnviando] = useState<"apertura" | "cierre" | null>(null);
+  const [motivo, setMotivo] = useState<TipoMotivo>("preventivo");
   const [editando, setEditando] = useState(false);
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
   const [confirmandoBaja, setConfirmandoBaja] = useState(false);
@@ -36,6 +46,7 @@ export function EventPanel({
         elemento_id: elemento.id,
         tipo,
         usuario,
+        motivo,
       });
       onEventoRegistrado(resultado.offline);
       onCerrarPanel();
@@ -165,7 +176,7 @@ export function EventPanel({
 
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-30 bg-panel-raised border-t border-panel-border rounded-t-2xl shadow-2xl safe-area-bottom"
+      className="fixed inset-x-0 bottom-0 z-30 bg-panel-raised border-t border-panel-border rounded-t-2xl shadow-2xl safe-area-bottom max-h-[85vh] overflow-y-auto"
       role="dialog"
       aria-label={`Registrar evento para ${elemento.nombre}`}
     >
@@ -183,6 +194,9 @@ export function EventPanel({
                 style={{ color: COLOR_ESTADO[elemento.estado] }}
               >
                 Estado actual: {LABEL_ESTADO[elemento.estado]}
+                {elemento.ultimo_evento_motivo && elemento.estado === "abierto"
+                  ? ` · ${elemento.ultimo_evento_motivo}`
+                  : ""}
               </p>
             )}
           </div>
@@ -196,22 +210,43 @@ export function EventPanel({
         </div>
 
         {!TIPOS_SIN_MANIOBRA.has(elemento.tipo) && (
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => handleRegistrar("apertura")}
-              disabled={enviando !== null}
-              className="h-16 rounded-xl bg-estado-abierto text-white font-display text-2xl tracking-wide disabled:opacity-50 active:scale-95 transition"
-            >
-              {enviando === "apertura" ? "Guardando…" : "ABRIR"}
-            </button>
-            <button
-              onClick={() => handleRegistrar("cierre")}
-              disabled={enviando !== null}
-              className="h-16 rounded-xl bg-estado-cerrado text-white font-display text-2xl tracking-wide disabled:opacity-50 active:scale-95 transition"
-            >
-              {enviando === "cierre" ? "Guardando…" : "CERRAR"}
-            </button>
-          </div>
+          <>
+            <label className="flex flex-col gap-1 text-sm text-slate-300 mb-3">
+              Motivo de la maniobra
+              <select
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value as TipoMotivo)}
+                className="campo-input"
+              >
+                {MOTIVOS.map((m) => (
+                  <option key={m.valor} value={m.valor}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => handleRegistrar("apertura")}
+                disabled={enviando !== null}
+                className="h-16 rounded-xl bg-estado-abierto text-white font-display text-2xl tracking-wide disabled:opacity-50 active:scale-95 transition"
+              >
+                {enviando === "apertura" ? "Guardando…" : "ABRIR"}
+              </button>
+              <button
+                onClick={() => handleRegistrar("cierre")}
+                disabled={enviando !== null}
+                className="h-16 rounded-xl bg-estado-cerrado text-white font-display text-2xl tracking-wide disabled:opacity-50 active:scale-95 transition"
+              >
+                {enviando === "cierre" ? "Guardando…" : "CERRAR"}
+              </button>
+            </div>
+          </>
+        )}
+
+        {elemento.tipo === "transformador" && (
+          <SalidasBTPanel elementoId={elemento.id} usuario={usuario} />
         )}
 
         <button

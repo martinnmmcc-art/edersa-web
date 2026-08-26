@@ -1,25 +1,27 @@
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/lib/supabase/client";
 import { encolarEvento } from "@/lib/db/offlineQueue";
-import type { EventoInput, TipoEvento } from "@/types";
+import type { EventoInput, TipoEvento, TipoMotivo } from "@/types";
 
-/**
- * Registra un evento operativo (apertura/cierre/etc.).
- * Si hay conexión, inserta directo en Supabase.
- * Si falla (sin internet, timeout, etc.), lo encola en IndexedDB
- * para que useOfflineSync lo reintente más tarde.
- */
 export async function registrarEvento(params: {
-  elemento_id: string;
+  elemento_id?: string;
+  salida_bt_id?: string;
   tipo: TipoEvento;
   usuario: string;
+  motivo?: TipoMotivo;
   observaciones?: string;
 }): Promise<{ ok: boolean; offline: boolean }> {
+  if (!params.elemento_id === !params.salida_bt_id) {
+    throw new Error("registrarEvento necesita elemento_id O salida_bt_id (uno solo).");
+  }
+
   const evento: EventoInput = {
     client_uuid: uuidv4(),
     elemento_id: params.elemento_id,
+    salida_bt_id: params.salida_bt_id,
     tipo: params.tipo,
     usuario: params.usuario,
+    motivo: params.motivo,
     observaciones: params.observaciones,
     fecha: new Date().toISOString(),
   };
@@ -31,16 +33,17 @@ export async function registrarEvento(params: {
 
   const { error } = await supabase.from("eventos").insert({
     client_uuid: evento.client_uuid,
-    elemento_id: evento.elemento_id,
+    elemento_id: evento.elemento_id ?? null,
+    salida_bt_id: evento.salida_bt_id ?? null,
     tipo: evento.tipo,
     usuario: evento.usuario,
+    motivo: evento.motivo ?? null,
     observaciones: evento.observaciones ?? null,
     fecha: evento.fecha,
     origen: "online",
   });
 
   if (error) {
-    // Conexión inestable / error de red: no perdemos el evento, lo encolamos.
     await encolarEvento({ ...evento, intentos: 0, creado_en: evento.fecha });
     return { ok: true, offline: true };
   }
@@ -48,21 +51,20 @@ export async function registrarEvento(params: {
   return { ok: true, offline: false };
 }
 
-/** Usado por useOfflineSync para reenviar un evento ya encolado. */
 export async function enviarEventoPendiente(evento: EventoInput) {
   const { error } = await supabase.from("eventos").insert({
     client_uuid: evento.client_uuid,
-    elemento_id: evento.elemento_id,
+    elemento_id: evento.elemento_id ?? null,
+    salida_bt_id: evento.salida_bt_id ?? null,
     tipo: evento.tipo,
     usuario: evento.usuario,
+    motivo: evento.motivo ?? null,
     observaciones: evento.observaciones ?? null,
     foto_url: evento.foto_url ?? null,
     fecha: evento.fecha,
     origen: "offline_sync",
   });
 
-  // Si el error es de "unique violation" en client_uuid, el evento ya
-  // se sincronizó antes (reintento duplicado) -> lo tratamos como éxito.
   if (error && error.code !== "23505") {
     throw error;
   }

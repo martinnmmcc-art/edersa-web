@@ -5,13 +5,16 @@ import maplibregl from "maplibre-gl";
 import { useMap } from "@/hooks/useMap";
 import { crearMarcadorEl } from "./crearMarcadorEl";
 import { SelectorEstiloMapa } from "./SelectorEstiloMapa";
-import type { ElementoEstado } from "@/types";
+import { dibujarTramos, dibujarPreviewTrazado } from "@/lib/tramosLayer";
+import type { ElementoEstado, TramoLinea } from "@/types";
 
 interface MapViewProps {
   elementos: ElementoEstado[];
   elementoSeleccionadoId: string | null;
   onSeleccionarElemento: (elemento: ElementoEstado) => void;
   onClickMapa?: (coords: { lat: number; lng: number }) => void;
+  tramos?: TramoLinea[];
+  puntosTrazado?: [number, number][];
 }
 
 const CONTAINER_ID = "edersa-map-container";
@@ -21,11 +24,15 @@ export function MapView({
   elementoSeleccionadoId,
   onSeleccionarElemento,
   onClickMapa,
+  tramos = [],
+  puntosTrazado = [],
 }: MapViewProps) {
   const { map, mapListo, errorMapa, modoMapa, cambiarModoMapa } = useMap({
     containerId: CONTAINER_ID,
   });
   const marcadoresRef = useRef<Map<string, maplibregl.Marker>>(new Map());
+  const tramosRef = useRef<TramoLinea[]>([]);
+  const puntosTrazadoRef = useRef<[number, number][]>([]);
 
   useEffect(() => {
     if (!map || !mapListo || !onClickMapa) return;
@@ -38,16 +45,12 @@ export function MapView({
     };
   }, [map, mapListo, onClickMapa]);
 
-  // Sincroniza los marcadores con la lista de elementos cada vez que cambia
-  // (nuevo evento, filtro aplicado, reconexión, etc.). Reutiliza los
-  // marcadores existentes en vez de recrearlos todos, para que el mapa
-  // no "parpadee" en cada actualización realtime.
+  // Sincroniza los marcadores con la lista de elementos.
   useEffect(() => {
     if (!map || !mapListo) return;
 
     const idsActuales = new Set(elementos.map((e) => e.id));
 
-    // eliminar marcadores de elementos que ya no están en la lista (filtrados)
     for (const [id, marker] of marcadoresRef.current) {
       if (!idsActuales.has(id)) {
         marker.remove();
@@ -59,10 +62,6 @@ export function MapView({
       const seleccionado = elemento.id === elementoSeleccionadoId;
       const existente = marcadoresRef.current.get(elemento.id);
 
-      // maplibregl.Marker no permite reemplazar su elemento DOM en caliente
-      // de forma confiable (guarda la referencia interna), así que ante
-      // cualquier cambio de apariencia (estado, selección) se recrea el
-      // marcador. Es barato: son decenas de elementos, no miles.
       if (existente) {
         existente.remove();
         marcadoresRef.current.delete(elemento.id);
@@ -80,7 +79,36 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, mapListo, elementos, elementoSeleccionadoId]);
 
-  // limpieza total al desmontar
+  // Dibuja/actualiza los tramos guardados (MT siempre, BT según zoom).
+  useEffect(() => {
+    tramosRef.current = tramos;
+    if (!map || !mapListo) return;
+    dibujarTramos(map, tramos);
+  }, [map, mapListo, tramos]);
+
+  // Dibuja/actualiza la línea "en construcción" del modo trazado.
+  useEffect(() => {
+    puntosTrazadoRef.current = puntosTrazado;
+    if (!map || !mapListo) return;
+    dibujarPreviewTrazado(map, puntosTrazado);
+  }, [map, mapListo, puntosTrazado]);
+
+  // IMPORTANTE: cambiar de estilo (calles/satélite/etc) borra las fuentes
+  // y capas custom que agregamos (a diferencia de los Marker, que son DOM
+  // aparte y sobreviven solos). Por eso hay que re-agregar tramos y
+  // preview cada vez que termina de cargar un estilo nuevo.
+  useEffect(() => {
+    if (!map) return;
+    const reagregar = () => {
+      dibujarTramos(map, tramosRef.current);
+      dibujarPreviewTrazado(map, puntosTrazadoRef.current);
+    };
+    map.on("style.load", reagregar);
+    return () => {
+      map.off("style.load", reagregar);
+    };
+  }, [map]);
+
   useEffect(() => {
     return () => {
       marcadoresRef.current.forEach((m) => m.remove());
