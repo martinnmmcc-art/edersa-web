@@ -113,7 +113,14 @@ export function MapView({
       }
 
       const el = crearMarcadorEl(elemento, seleccionado);
-      el.onclick = () => onSeleccionarElemento(elemento);
+      el.onclick = (ev) => {
+        // Evita que el toque sobre el marcador también le llegue al mapa
+        // (que en modo trazado/alta interpretaría el mismo toque como un
+        // click sobre el mapa vacío). Sin esto, tocar un elemento
+        // mientras estás trazando dispara las dos acciones a la vez.
+        ev.stopPropagation();
+        onSeleccionarElemento(elemento);
+      };
 
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([elemento.lng, elemento.lat])
