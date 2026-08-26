@@ -199,6 +199,8 @@ export interface TramoLinea {
   nombre: string | null;
   color: string | null;
   puntos: [number, number][]; // [lng, lat][]
+  alimentador_id_b: string | null;
+  elemento_frontera_id: string | null;
 }
 
 export interface NuevoTramoInput {
@@ -207,4 +209,6 @@ export interface NuevoTramoInput {
   nombre?: string;
   color?: string;
   puntos: [number, number][];
+  alimentador_id_b?: string | null;
+  elemento_frontera_id?: string | null;
 }

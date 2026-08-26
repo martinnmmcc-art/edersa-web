@@ -2,18 +2,22 @@
 
 import { useState } from "react";
 import { actualizarTramo, darDeBajaTramo } from "@/services/tramosService";
-import type { Alimentador } from "@/types";
+import { describirEstadoAnillo } from "@/lib/anillado";
+import type { Alimentador, ElementoEstado, TramoLinea } from "@/types";
 
 export interface TramoSeleccionado {
   id: string;
   nombre: string;
   tension: string;
   alimentador_id: string;
+  alimentador_id_b: string;
+  elemento_frontera_id: string;
 }
 
 interface TramoInfoPanelProps {
   tramo: TramoSeleccionado;
   alimentadores: Alimentador[];
+  elementos: ElementoEstado[];
   onCerrar: () => void;
   onActualizado: () => void;
 }
@@ -21,14 +25,29 @@ interface TramoInfoPanelProps {
 export function TramoInfoPanel({
   tramo,
   alimentadores,
+  elementos,
   onCerrar,
   onActualizado,
 }: TramoInfoPanelProps) {
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [confirmandoBaja, setConfirmandoBaja] = useState(false);
+  const [esAnillo, setEsAnillo] = useState(Boolean(tramo.elemento_frontera_id));
 
   const alimentadorActual = alimentadores.find((a) => a.id === tramo.alimentador_id);
+  const omnirouters = elementos.filter((e) => e.tipo === "omnirouter");
+
+  const tramoParaDescripcion: TramoLinea = {
+    id: tramo.id,
+    nombre: tramo.nombre || null,
+    tension: tramo.tension as TramoLinea["tension"],
+    alimentador_id: tramo.alimentador_id || null,
+    alimentador_id_b: tramo.alimentador_id_b || null,
+    elemento_frontera_id: tramo.elemento_frontera_id || null,
+    color: null,
+    puntos: [],
+  };
+  const estadoAnillo = describirEstadoAnillo(tramoParaDescripcion, alimentadores, elementos);
 
   async function handleGuardar(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -38,6 +57,10 @@ export function TramoInfoPanel({
       await actualizarTramo(tramo.id, {
         alimentador_id: (form.get("alimentador_id") as string) || null,
         nombre: String(form.get("nombre") || "") || null,
+        alimentador_id_b: esAnillo ? (form.get("alimentador_id_b") as string) || null : null,
+        elemento_frontera_id: esAnillo
+          ? (form.get("elemento_frontera_id") as string) || null
+          : null,
       });
       onActualizado();
       onCerrar();
@@ -59,7 +82,7 @@ export function TramoInfoPanel({
 
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-30 bg-panel-raised border-t border-panel-border rounded-t-2xl shadow-2xl"
+      className="fixed inset-x-0 bottom-0 z-30 bg-panel-raised border-t border-panel-border rounded-t-2xl shadow-2xl max-h-[85vh] overflow-y-auto"
       role="dialog"
       aria-label="Información del tramo"
     >
@@ -82,6 +105,9 @@ export function TramoInfoPanel({
                       : "sin asignar"}
                   </span>
                 </p>
+                {estadoAnillo && (
+                  <p className="text-xs mt-1 text-acento font-semibold">🔗 {estadoAnillo}</p>
+                )}
               </div>
               <button
                 onClick={onCerrar}
@@ -96,7 +122,7 @@ export function TramoInfoPanel({
               onClick={() => setEditando(true)}
               className="w-full h-touch rounded-xl bg-acento text-panel font-semibold"
             >
-              Editar tramo
+              Editar tramo / anillo
             </button>
           </>
         ) : (
@@ -114,7 +140,7 @@ export function TramoInfoPanel({
             </label>
 
             <label className="flex flex-col gap-1 text-sm text-slate-300">
-              Alimentador
+              Alimentador {esAnillo ? "principal" : ""}
               <select
                 name="alimentador_id"
                 defaultValue={tramo.alimentador_id}
@@ -128,6 +154,51 @@ export function TramoInfoPanel({
                 ))}
               </select>
             </label>
+
+            <label className="flex items-center gap-2 text-sm text-slate-300 mt-1">
+              <input
+                type="checkbox"
+                checked={esAnillo}
+                onChange={(e) => setEsAnillo(e.target.checked)}
+                className="w-5 h-5"
+              />
+              Este tramo forma parte de un anillo
+            </label>
+
+            {esAnillo && (
+              <div className="bg-panel rounded-lg p-3 flex flex-col gap-3">
+                <label className="flex flex-col gap-1 text-sm text-slate-300">
+                  Alimentador secundario
+                  <select
+                    name="alimentador_id_b"
+                    defaultValue={tramo.alimentador_id_b}
+                    className="campo-input"
+                  >
+                    <option value="">Elegir…</option>
+                    {alimentadores.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.nombre} ({a.tension_kv}kV)
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-sm text-slate-300">
+                  Omnirouter que define el anillo
+                  <select
+                    name="elemento_frontera_id"
+                    defaultValue={tramo.elemento_frontera_id}
+                    className="campo-input"
+                  >
+                    <option value="">Elegir…</option>
+                    {omnirouters.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
 
             <div className="flex gap-3 mt-1">
               <button

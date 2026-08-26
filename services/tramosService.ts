@@ -20,6 +20,8 @@ export async function crearTramo(input: NuevoTramoInput) {
       nombre: input.nombre || null,
       color: input.color || null,
       puntos: input.puntos,
+      alimentador_id_b: input.alimentador_id_b ?? null,
+      elemento_frontera_id: input.elemento_frontera_id ?? null,
     })
     .select()
     .single();
@@ -30,7 +32,12 @@ export async function crearTramo(input: NuevoTramoInput) {
 
 export async function actualizarTramo(
   id: string,
-  cambios: { alimentador_id?: string | null; nombre?: string | null }
+  cambios: {
+    alimentador_id?: string | null;
+    nombre?: string | null;
+    alimentador_id_b?: string | null;
+    elemento_frontera_id?: string | null;
+  }
 ) {
   const { error } = await supabase.from("tramos_linea").update(cambios).eq("id", id);
   if (error) throw error;

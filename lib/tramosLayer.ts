@@ -24,6 +24,8 @@ function tramosAGeoJSON(tramos: TramoLinea[]) {
         nombre: t.nombre ?? "",
         tension: t.tension,
         alimentador_id: t.alimentador_id ?? "",
+        alimentador_id_b: t.alimentador_id_b ?? "",
+        elemento_frontera_id: t.elemento_frontera_id ?? "",
         color: t.color || (t.tension === "MT" ? "#facc15" : "#38bdf8"),
       },
       geometry: { type: "LineString" as const, coordinates: t.puntos },

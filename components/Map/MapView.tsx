@@ -67,6 +67,8 @@ export function MapView({
         nombre: String(feature.properties?.nombre ?? ""),
         tension: String(feature.properties?.tension ?? "MT"),
         alimentador_id: String(feature.properties?.alimentador_id ?? ""),
+        alimentador_id_b: String(feature.properties?.alimentador_id_b ?? ""),
+        elemento_frontera_id: String(feature.properties?.elemento_frontera_id ?? ""),
       });
     };
 
