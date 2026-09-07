@@ -34,8 +34,6 @@ const TODOS_LOS_TIPOS: TipoElemento[] = [
   "generador",
 ];
 
-// Radio de "pegado" de respaldo, por si algún llamado no trae el radio
-// calculado dinámicamente según el zoom (ver MapView.tsx).
 const UMBRAL_SNAP_METROS_DEFECTO = 15;
 
 interface PuntoTrazado {
@@ -65,12 +63,10 @@ export default function MapaPage() {
   } | null>(null);
   const [mostrarFormElemento, setMostrarFormElemento] = useState(false);
 
-  // --- Trazado libre (multi-punto) ---
   const [modoTrazado, setModoTrazado] = useState(false);
   const [puntosTrazadoInfo, setPuntosTrazadoInfo] = useState<PuntoTrazado[]>([]);
   const [mostrarFormTramo, setMostrarFormTramo] = useState(false);
 
-  // --- Conectar 2 elementos directo (atajo rápido) ---
   const [modoConectar, setModoConectar] = useState(false);
   const [origenConectar, setOrigenConectar] = useState<ElementoEstado | null>(null);
 
@@ -105,7 +101,7 @@ export default function MapaPage() {
       ...t,
       color: energizacion.tramosEnergizados.has(t.id)
         ? resolverColorTramo(t, alimentadores, elementos)
-        : "#6b7280", // gris: sin tensión
+        : "#6b7280",
     }));
   }, [tramos, alimentadores, elementos, energizacion]);
 
@@ -130,7 +126,7 @@ export default function MapaPage() {
   }
 
   function handleClickMapa(coords: { lat: number; lng: number; radioSnapMetros?: number }) {
-    if (modoConectar) return; // acá solo interesan los toques sobre elementos
+    if (modoConectar) return;
 
     if (modoAltaElemento) {
       setUbicacionNuevoElemento(coords);
@@ -157,8 +153,6 @@ export default function MapaPage() {
     }
   }
 
-  // Qué hacer cuando se toca un elemento (marcador) en el mapa, según
-  // el modo activo.
   function handleTocarElemento(elemento: ElementoEstado) {
     if (modoConectar) {
       if (!origenConectar) {
@@ -224,10 +218,6 @@ export default function MapaPage() {
     setPuntosTrazadoInfo((prev) => prev.slice(0, -1));
   }
 
-  // Al guardar un tramo nuevo, si alguno de sus puntos quedó "empalmado"
-  // en el medio de un tramo viejo, hay que partir ese tramo viejo
-  // insertándole el vértice nuevo — si no, la unión queda solo visual
-  // (dos líneas que pasan cerca) y no una conexión real en los datos.
   async function aplicarEmpalmesPendientes() {
     const porTramo = new Map<string, EmpalmePendiente[]>();
     for (const p of puntosTrazadoInfo) {
@@ -242,8 +232,6 @@ export default function MapaPage() {
       if (!tramoViejo) continue;
 
       const nuevosPuntos = [...tramoViejo.puntos];
-      // Insertar de mayor a menor índice para no invalidar los índices
-      // ya calculados a medida que se insertan los anteriores.
       const puntoDelEmpalme = (e: EmpalmePendiente) =>
         puntosTrazadoInfo.find((p) => p.empalme === e)!.coord;
 
