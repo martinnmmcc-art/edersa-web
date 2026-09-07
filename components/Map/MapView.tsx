@@ -19,6 +19,7 @@ interface MapViewProps {
   puntosConectados?: boolean[];
   onSeleccionarTramo?: (tramo: TramoSeleccionado) => void;
   elementosEnergizadosIds?: Set<string>;
+  modoEspecialActivo?: boolean;
 }
 
 const CONTAINER_ID = "edersa-map-container";
@@ -34,6 +35,7 @@ export function MapView({
   puntosConectados = [],
   onSeleccionarTramo,
   elementosEnergizadosIds,
+  modoEspecialActivo = false,
 }: MapViewProps) {
   const { map, mapListo, errorMapa, modoMapa, cambiarModoMapa } = useMap({
     containerId: CONTAINER_ID,
@@ -44,36 +46,40 @@ export function MapView({
   const puntosConectadosRef = useRef<boolean[]>([]);
   const onSeleccionarTramoRef = useRef(onSeleccionarTramo);
   const onClickMapaRef = useRef(onClickMapa);
+  const modoEspecialActivoRef = useRef(modoEspecialActivo);
 
   useEffect(() => {
     onSeleccionarTramoRef.current = onSeleccionarTramo;
     onClickMapaRef.current = onClickMapa;
-  }, [onSeleccionarTramo, onClickMapa]);
+    modoEspecialActivoRef.current = modoEspecialActivo;
+  }, [onSeleccionarTramo, onClickMapa, modoEspecialActivo]);
 
   useEffect(() => {
     if (!map || !mapListo) return;
 
     const handler = (e: maplibregl.MapMouseEvent) => {
-      const capasListas = CAPAS_HITBOX.filter((c) => map.getLayer(c));
+      if (!modoEspecialActivoRef.current) {
+        const capasListas = CAPAS_HITBOX.filter((c) => map.getLayer(c));
 
-      if (capasListas.length > 0 && onSeleccionarTramoRef.current) {
-        let features: maplibregl.MapGeoJSONFeature[] = [];
-        try {
-          features = map.queryRenderedFeatures(e.point, { layers: capasListas });
-        } catch {
-          features = [];
-        }
-        const feature = features[0];
-        if (feature) {
-          onSeleccionarTramoRef.current({
-            id: String(feature.properties?.id ?? ""),
-            nombre: String(feature.properties?.nombre ?? ""),
-            tension: String(feature.properties?.tension ?? "MT"),
-            alimentador_id: String(feature.properties?.alimentador_id ?? ""),
-            alimentador_id_b: String(feature.properties?.alimentador_id_b ?? ""),
-            elemento_frontera_id: String(feature.properties?.elemento_frontera_id ?? ""),
-          });
-          return;
+        if (capasListas.length > 0 && onSeleccionarTramoRef.current) {
+          let features: maplibregl.MapGeoJSONFeature[] = [];
+          try {
+            features = map.queryRenderedFeatures(e.point, { layers: capasListas });
+          } catch {
+            features = [];
+          }
+          const feature = features[0];
+          if (feature) {
+            onSeleccionarTramoRef.current({
+              id: String(feature.properties?.id ?? ""),
+              nombre: String(feature.properties?.nombre ?? ""),
+              tension: String(feature.properties?.tension ?? "MT"),
+              alimentador_id: String(feature.properties?.alimentador_id ?? ""),
+              alimentador_id_b: String(feature.properties?.alimentador_id_b ?? ""),
+              elemento_frontera_id: String(feature.properties?.elemento_frontera_id ?? ""),
+            });
+            return;
+          }
         }
       }
 
