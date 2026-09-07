@@ -34,15 +34,7 @@ const TODOS_LOS_TIPOS: TipoElemento[] = [
   "generador",
 ];
 
-// Radio de "pegado" de respaldo, por si algún llamado no trae el radio
-// calculado dinámicamente según el zoom (ver MapView.tsx).
 const UMBRAL_SNAP_METROS_DEFECTO = 15;
-
-interface PuntoTrazado {
-  coord: [number, number]; // [lng, lat]
-  conectado: boolean;
-  empalme: EmpalmePendiente | null;
-}
 
 interface PuntoTrazado {
   coord: [number, number];
@@ -71,12 +63,10 @@ export default function MapaPage() {
   } | null>(null);
   const [mostrarFormElemento, setMostrarFormElemento] = useState(false);
 
-  // --- Trazado libre (multi-punto) ---
   const [modoTrazado, setModoTrazado] = useState(false);
   const [puntosTrazadoInfo, setPuntosTrazadoInfo] = useState<PuntoTrazado[]>([]);
   const [mostrarFormTramo, setMostrarFormTramo] = useState(false);
 
-  // --- Conectar 2 elementos directo (atajo rápido) ---
   const [modoConectar, setModoConectar] = useState(false);
   const [origenConectar, setOrigenConectar] = useState<ElementoEstado | null>(null);
 
@@ -109,7 +99,7 @@ export default function MapaPage() {
       ...t,
       color: energizacion.tramosEnergizados.has(t.id)
         ? resolverColorTramo(t, alimentadores, elementos)
-        : "#6b7280", // gris: sin tensión
+        : "#6b7280",
     }));
   }, [tramos, alimentadores, elementos, energizacion]);
 
@@ -134,7 +124,7 @@ export default function MapaPage() {
   }
 
   function handleClickMapa(coords: { lat: number; lng: number; radioSnapMetros?: number }) {
-    if (modoConectar) return; // acá solo interesan los toques sobre elementos
+    if (modoConectar) return;
 
     if (modoAltaElemento) {
       setUbicacionNuevoElemento(coords);
@@ -161,8 +151,6 @@ export default function MapaPage() {
     }
   }
 
-  // Qué hacer cuando se toca un elemento (marcador) en el mapa, según
-  // el modo activo.
   function handleTocarElemento(elemento: ElementoEstado) {
     if (modoConectar) {
       if (!origenConectar) {
@@ -228,10 +216,6 @@ export default function MapaPage() {
     setPuntosTrazadoInfo((prev) => prev.slice(0, -1));
   }
 
-  // Al guardar un tramo nuevo, si alguno de sus puntos quedó "empalmado"
-  // en el medio de un tramo viejo, hay que partir ese tramo viejo
-  // insertándole el vértice nuevo — si no, la unión queda solo visual
-  // (dos líneas que pasan cerca) y no una conexión real en los datos.
   async function aplicarEmpalmesPendientes() {
     const porTramo = new Map<string, EmpalmePendiente[]>();
     for (const p of puntosTrazadoInfo) {
@@ -246,8 +230,6 @@ export default function MapaPage() {
       if (!tramoViejo) continue;
 
       const nuevosPuntos = [...tramoViejo.puntos];
-      // Insertar de mayor a menor índice para no invalidar los índices
-      // ya calculados a medida que se insertan los anteriores.
       const puntoDelEmpalme = (e: EmpalmePendiente) =>
         puntosTrazadoInfo.find((p) => p.empalme === e)!.coord;
 
@@ -343,11 +325,37 @@ export default function MapaPage() {
 
       {modoTrazado && (
         <div className="fixed bottom-4 inset-x-4 z-20 bg-panel-raised border border-panel-border rounded-xl shadow-lg p-3">
-          <p className="text-sm text-slate-300 mb-2">
+          <p className="text-sm text-slate-300 mb-1">
             {puntosTrazadoInfo.length === 0
               ? "Tocá el mapa, un elemento, o cualquier punto de otra línea para arrancar desde ahí."
-              : `${puntosTrazadoInfo.length} punto${puntosTrazadoInfo.length !== 1 ? "s" : ""} · verde = conectado a algo real, naranja = suelto`}
+              : `${puntosTrazadoInfo.length} punto${puntosTrazadoInfo.length !== 1 ? "s" : ""} · verde = conectado, naranja = suelto`}
           </p>
+          {puntosTrazadoInfo.length > 0 && (
+            <p className="text-xs mb-2 font-semibold">
+              {(() => {
+                const ultimo = puntosTrazadoInfo[puntosTrazadoInfo.length - 1];
+                if (ultimo.empalme) {
+                  return (
+                    <span className="text-estado-cerrado">
+                      ✂️ Último punto: va a partir una línea existente para unirse ahí.
+                    </span>
+                  );
+                }
+                if (ultimo.conectado) {
+                  return (
+                    <span className="text-estado-cerrado">
+                      ✅ Último punto: pegado exacto a un elemento o vértice ya existente.
+                    </span>
+                  );
+                }
+                return (
+                  <span className="text-acento">
+                    ⚠️ Último punto: quedó suelto, no detectó nada cerca para unir.
+                  </span>
+                );
+              })()}
+            </p>
+          )}
           <div className="flex items-center gap-2">
             <button
               onClick={handleDeshacerPunto}
