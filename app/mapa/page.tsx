@@ -33,9 +33,6 @@ const TODOS_LOS_TIPOS: TipoElemento[] = [
   "generador",
 ];
 
-// Distancia máxima para "pegar" un punto trazado a un elemento o a otro
-// tramo cercano. 15m es holgado para GPS de celular común pero no tanto
-// como para pegar cosas que en realidad están en veredas distintas.
 const UMBRAL_SNAP_METROS = 15;
 
 export default function MapaPage() {
@@ -61,7 +58,11 @@ export default function MapaPage() {
 
   const [modoTrazado, setModoTrazado] = useState(false);
   const [puntosTrazado, setPuntosTrazado] = useState<[number, number][]>([]);
+  const [puntosConectados, setPuntosConectados] = useState<boolean[]>([]);
   const [mostrarFormTramo, setMostrarFormTramo] = useState(false);
+
+  const [modoConectar, setModoConectar] = useState(false);
+  const [origenConectar, setOrigenConectar] = useState<ElementoEstado | null>(null);
 
   const [tramoSeleccionado, setTramoSeleccionado] = useState<TramoSeleccionado | null>(
     null
@@ -70,9 +71,7 @@ export default function MapaPage() {
   useEffect(() => {
     obtenerAlimentadores()
       .then((data) => setAlimentadores(data as Alimentador[]))
-      .catch(() => {
-        /* si falla (ej. offline), simplemente no se muestran filtros por alimentador */
-      });
+      .catch(() => {});
   }, []);
 
   const elementosFiltrados = useMemo(() => {
@@ -84,9 +83,6 @@ export default function MapaPage() {
     });
   }, [elementos, tiposActivos, alimentadorId]);
 
-  // Tramos con el color ya resuelto (según alimentador y estado de
-  // anillo en vivo) — esto es lo único que se le pasa al mapa para
-  // dibujar; el resto de los datos del tramo quedan intactos.
   const energizacion = useMemo(
     () => calcularEnergizacion(tramos, elementos),
     [tramos, elementos]
@@ -97,12 +93,10 @@ export default function MapaPage() {
       ...t,
       color: energizacion.tramosEnergizados.has(t.id)
         ? resolverColorTramo(t, alimentadores, elementos)
-        : "#6b7280", // gris: sin tensión, no le llega energía desde ninguna fuente
+        : "#6b7280",
     }));
   }, [tramos, alimentadores, elementos, energizacion]);
 
-  // Todos los puntos "enganchables": la ubicación de cada elemento
-  // activo + cada vértice de cada tramo ya trazado.
   const puntosEnganchables = useMemo(() => {
     const deElementos = elementos.map((e) => ({ lat: e.lat, lng: e.lng }));
     const deTramos = tramos.flatMap((t) =>
@@ -121,6 +115,8 @@ export default function MapaPage() {
   }
 
   function handleClickMapa(coords: { lat: number; lng: number }) {
+    if (modoConectar) return;
+
     if (modoAltaElemento) {
       setUbicacionNuevoElemento(coords);
       setMostrarFormElemento(true);
@@ -128,37 +124,79 @@ export default function MapaPage() {
       return;
     }
     if (modoTrazado) {
-      // Si el punto tocado está cerca de un elemento o de otro tramo,
-      // se "pega" a esa coordenada exacta en vez de quedar suelto —
-      // así quedan realmente conectados (mismo punto), no solo
-      // visualmente cerca.
       const pegado = buscarPuntoCercano(coords, puntosEnganchables, UMBRAL_SNAP_METROS);
       const punto = pegado ?? coords;
       setPuntosTrazado((prev) => [...prev, [punto.lng, punto.lat]]);
+      setPuntosConectados((prev) => [...prev, Boolean(pegado)]);
     }
   }
 
-  // Si estás en modo alta/trazado y tocás justo sobre un tramo existente,
-  // priorizamos la acción del modo activo en vez de abrir la info del
-  // tramo — evita que se abran los dos paneles a la vez.
+  function handleTocarElemento(elemento: ElementoEstado) {
+    if (modoConectar) {
+      if (!origenConectar) {
+        setOrigenConectar(elemento);
+        return;
+      }
+      if (origenConectar.id === elemento.id) return;
+      setPuntosTrazado([
+        [origenConectar.lng, origenConectar.lat],
+        [elemento.lng, elemento.lat],
+      ]);
+      setPuntosConectados([true, true]);
+      setModoConectar(false);
+      setOrigenConectar(null);
+      setMostrarFormTramo(true);
+      return;
+    }
+
+    if (modoTrazado) {
+      setPuntosTrazado((prev) => [...prev, [elemento.lng, elemento.lat]]);
+      setPuntosConectados((prev) => [...prev, true]);
+      return;
+    }
+
+    if (modoAltaElemento) return;
+
+    setElementoSeleccionado(elemento);
+  }
+
   function handleSeleccionarTramo(tramo: TramoSeleccionado) {
-    if (modoAltaElemento || modoTrazado) return;
+    if (modoAltaElemento || modoTrazado || modoConectar) return;
     setTramoSeleccionado(tramo);
   }
 
   function handleActivarTrazado() {
     setModoTrazado(true);
     setPuntosTrazado([]);
+    setPuntosConectados([]);
     setModoAltaElemento(false);
+    setModoConectar(false);
+    setOrigenConectar(null);
+  }
+
+  function handleActivarConectar() {
+    setModoConectar(true);
+    setOrigenConectar(null);
+    setModoTrazado(false);
+    setModoAltaElemento(false);
+    setPuntosTrazado([]);
+    setPuntosConectados([]);
   }
 
   function handleCancelarTrazado() {
     setModoTrazado(false);
     setPuntosTrazado([]);
+    setPuntosConectados([]);
+  }
+
+  function handleCancelarConectar() {
+    setModoConectar(false);
+    setOrigenConectar(null);
   }
 
   function handleDeshacerPunto() {
     setPuntosTrazado((prev) => prev.slice(0, -1));
+    setPuntosConectados((prev) => prev.slice(0, -1));
   }
 
   if (!cargado) return null;
@@ -171,11 +209,14 @@ export default function MapaPage() {
     <main className="h-dvh w-full relative overflow-hidden">
       <MapView
         elementos={elementosFiltrados}
-        elementoSeleccionadoId={elementoSeleccionado?.id ?? null}
-        onSeleccionarElemento={setElementoSeleccionado}
+        elementoSeleccionadoId={
+          origenConectar?.id ?? elementoSeleccionado?.id ?? null
+        }
+        onTocarElemento={handleTocarElemento}
         onClickMapa={handleClickMapa}
         tramos={tramosParaMapa}
         puntosTrazado={puntosTrazado}
+        puntosConectados={puntosConectados}
         onSeleccionarTramo={handleSeleccionarTramo}
         elementosEnergizadosIds={energizacion.elementosEnergizados}
       />
@@ -194,8 +235,14 @@ export default function MapaPage() {
         </div>
       )}
 
-      {!modoTrazado && (
+      {!modoTrazado && !modoConectar && (
         <div className="fixed bottom-4 left-4 z-20 flex flex-col gap-2 items-start">
+          <button
+            onClick={handleActivarConectar}
+            className="h-touch px-4 rounded-full font-semibold shadow-lg bg-panel-raised border border-panel-border text-slate-200"
+          >
+            🔗 Conectar 2 puntos
+          </button>
           <button
             onClick={handleActivarTrazado}
             className="h-touch px-4 rounded-full font-semibold shadow-lg bg-panel-raised border border-panel-border text-slate-200"
@@ -215,14 +262,28 @@ export default function MapaPage() {
         </div>
       )}
 
+      {modoConectar && (
+        <div className="fixed bottom-4 inset-x-4 z-20 bg-panel-raised border border-panel-border rounded-xl shadow-lg p-3">
+          <p className="text-sm text-slate-300 mb-2">
+            {!origenConectar
+              ? "Tocá el primer elemento (el punto de partida)."
+              : `Origen: ${origenConectar.nombre}. Ahora tocá el segundo elemento para conectarlos con una línea recta.`}
+          </p>
+          <button
+            onClick={handleCancelarConectar}
+            className="h-9 px-3 rounded-lg border border-estado-abierto text-estado-abierto text-sm w-full"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+
       {modoTrazado && (
         <div className="fixed bottom-4 inset-x-4 z-20 bg-panel-raised border border-panel-border rounded-xl shadow-lg p-3">
           <p className="text-sm text-slate-300 mb-2">
             {puntosTrazado.length === 0
-              ? "Tocá el mapa para marcar el primer punto. Si tocás cerca de un elemento o de otra línea, se engancha solo."
-              : `${puntosTrazado.length} punto${puntosTrazado.length !== 1 ? "s" : ""} marcado${
-                  puntosTrazado.length !== 1 ? "s" : ""
-                } · seguí tocando para agregar más`}
+              ? "Tocá el mapa o un elemento para marcar el primer punto."
+              : `${puntosTrazado.length} punto${puntosTrazado.length !== 1 ? "s" : ""} · verde = conectado a algo real, naranja = suelto`}
           </p>
           <div className="flex items-center gap-2">
             <button
@@ -286,6 +347,7 @@ export default function MapaPage() {
             recargarTramos();
             setModoTrazado(false);
             setPuntosTrazado([]);
+            setPuntosConectados([]);
           }}
         />
       )}
