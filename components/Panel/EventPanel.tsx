@@ -127,7 +127,8 @@ export function EventPanel({
       const resultado = buscarSegmentoMasCercano(
         { lat: elemento.lat, lng: elemento.lng },
         tramos,
-        UMBRAL_SOLDAR_METROS
+        UMBRAL_SOLDAR_METROS,
+        elemento.alimentador_id
       );
       if (!resultado) {
         setMensajeSoldadura(

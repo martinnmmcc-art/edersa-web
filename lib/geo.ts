@@ -95,6 +95,7 @@ export function deduplicarPuntosConsecutivos(
 export interface TramoParaSnap {
   id: string;
   puntos: [number, number][]; // [lng, lat][]
+  alimentador_id?: string | null;
 }
 
 export interface EmpalmePendiente {
@@ -114,29 +115,48 @@ export interface ResultadoSnap {
  * a insertar en el tramo viejo es el mismo `punto` de entrada (no uno
  * proyectado), porque el objetivo es unir el elemento tal cual está,
  * no correrlo a la línea.
+ *
+ * Si se pasa `alimentadorPreferidoId`, primero busca SOLO entre los
+ * tramos de ese alimentador — esto es clave cuando hay líneas de
+ * alimentadores distintos pasando cerca una de la otra (mismo poste):
+ * sin esto, "la línea más cercana" a veces termina siendo la del
+ * alimentador equivocado en vez de la que el elemento realmente tiene
+ * asignada. Si no hay ninguna del alimentador preferido cerca, recién
+ * ahí cae a buscar entre cualquier tramo.
  */
 export function buscarSegmentoMasCercano(
   punto: Punto,
   tramos: TramoParaSnap[],
-  umbralMetros: number
+  umbralMetros: number,
+  alimentadorPreferidoId?: string | null
 ): EmpalmePendiente | null {
-  let mejor: EmpalmePendiente | null = null;
-  let mejorDistancia = umbralMetros;
+  function buscarEntre(lista: TramoParaSnap[]): EmpalmePendiente | null {
+    let mejor: EmpalmePendiente | null = null;
+    let mejorDistancia = umbralMetros;
 
-  for (const tramo of tramos) {
-    for (let i = 0; i < tramo.puntos.length - 1; i++) {
-      const [lngA, latA] = tramo.puntos[i];
-      const [lngB, latB] = tramo.puntos[i + 1];
-      if (lngA === lngB && latA === latB) continue; // segmento de largo cero: ignorar
-      const proy = proyectarPuntoEnSegmento(punto, { lat: latA, lng: lngA }, { lat: latB, lng: lngB });
-      if (proy.distancia <= mejorDistancia) {
-        mejorDistancia = proy.distancia;
-        mejor = { tramoId: tramo.id, segmentoIndice: i };
+    for (const tramo of lista) {
+      for (let i = 0; i < tramo.puntos.length - 1; i++) {
+        const [lngA, latA] = tramo.puntos[i];
+        const [lngB, latB] = tramo.puntos[i + 1];
+        if (lngA === lngB && latA === latB) continue; // segmento de largo cero: ignorar
+        const proy = proyectarPuntoEnSegmento(punto, { lat: latA, lng: lngA }, { lat: latB, lng: lngB });
+        if (proy.distancia <= mejorDistancia) {
+          mejorDistancia = proy.distancia;
+          mejor = { tramoId: tramo.id, segmentoIndice: i };
+        }
       }
     }
+
+    return mejor;
   }
 
-  return mejor;
+  if (alimentadorPreferidoId) {
+    const delAlimentador = tramos.filter((t) => t.alimentador_id === alimentadorPreferidoId);
+    const encontrado = buscarEntre(delAlimentador);
+    if (encontrado) return encontrado;
+  }
+
+  return buscarEntre(tramos);
 }
 
 /**

@@ -444,17 +444,20 @@ export default function MapaPage() {
             setMostrarFormElemento(false);
             setUbicacionNuevoElemento(null);
           }}
-          onCreado={async () => {
+          onCreado={async (alimentadorIdCreado) => {
             // Si el punto donde se creó el elemento cae cerca de una
             // línea ya trazada, lo "suelda" ahí mismo (sin moverlo) para
-            // que quede realmente conectado desde el primer momento —
-            // esto es justo lo que faltaba y causaba que un seccionador
-            // recién cargado quedara separado de la línea.
+            // que quede realmente conectado desde el primer momento.
+            // Prioriza la línea del MISMO alimentador que se le asignó
+            // al elemento — si no, cuando hay dos líneas de
+            // alimentadores distintos pasando cerca (mismo poste),
+            // podía terminar soldado a la equivocada.
             if (ubicacionNuevoElemento) {
               const resultado = buscarSegmentoMasCercano(
                 ubicacionNuevoElemento,
                 tramos,
-                UMBRAL_AUTOSOLDAR_METROS
+                UMBRAL_AUTOSOLDAR_METROS,
+                alimentadorIdCreado
               );
               if (resultado) {
                 const tramoViejo = tramos.find((t) => t.id === resultado.tramoId);

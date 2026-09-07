@@ -12,7 +12,7 @@ interface ElementoFormProps {
   alimentadores: Alimentador[];
   ubicacionPreseleccionada: { lat: number; lng: number } | null;
   onCerrar: () => void;
-  onCreado: () => void;
+  onCreado: (alimentadorId: string | null) => void;
 }
 
 const TIPOS: TipoElemento[] = [
@@ -110,7 +110,7 @@ export function ElementoForm({
           lng,
         });
       }
-      onCreado();
+      onCreado(alimentador_id);
       onCerrar();
     } catch (err: any) {
       setErrorMsg(err?.message ?? "No se pudo guardar el elemento.");
