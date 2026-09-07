@@ -52,6 +52,17 @@ export async function darDeBajaTramo(id: string) {
   if (error) throw error;
 }
 
+/**
+ * Reemplaza la geometría (los puntos) de un tramo existente. Se usa
+ * para "partir" un tramo viejo cuando un nuevo trazado arranca desde
+ * un punto en el medio de su recorrido — así la unión queda real en
+ * los datos (comparten un vértice exacto), no solo cerca visualmente.
+ */
+export async function actualizarPuntosTramo(id: string, puntos: [number, number][]) {
+  const { error } = await supabase.from("tramos_linea").update({ puntos }).eq("id", id);
+  if (error) throw error;
+}
+
 export function suscribirseATramos(onCambio: () => void) {
   const canal = supabase
     .channel(nombreCanalUnico("tramos-realtime"))
