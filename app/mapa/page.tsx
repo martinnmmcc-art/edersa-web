@@ -34,7 +34,9 @@ const TODOS_LOS_TIPOS: TipoElemento[] = [
   "generador",
 ];
 
-const UMBRAL_SNAP_METROS_DEFECTO = 15;
+// Radio de "pegado" de respaldo, por si algún llamado no trae el radio
+// calculado dinámicamente según el zoom (ver MapView.tsx).
+const UMBRAL_SNAP_METROS_DEFECTO = 10;
 
 interface PuntoTrazado {
   coord: [number, number]; // [lng, lat]
@@ -63,10 +65,15 @@ export default function MapaPage() {
   } | null>(null);
   const [mostrarFormElemento, setMostrarFormElemento] = useState(false);
 
+  // --- Trazado libre (multi-punto) ---
   const [modoTrazado, setModoTrazado] = useState(false);
   const [puntosTrazadoInfo, setPuntosTrazadoInfo] = useState<PuntoTrazado[]>([]);
   const [mostrarFormTramo, setMostrarFormTramo] = useState(false);
+  // Apagalo cuando dos líneas de alimentadores distintos van a pasar
+  // cerca a propósito (mismo poste) y no querés que se unan solas.
+  const [pegadoActivo, setPegadoActivo] = useState(true);
 
+  // --- Conectar 2 elementos directo (atajo rápido) ---
   const [modoConectar, setModoConectar] = useState(false);
   const [origenConectar, setOrigenConectar] = useState<ElementoEstado | null>(null);
 
@@ -101,7 +108,7 @@ export default function MapaPage() {
       ...t,
       color: energizacion.tramosEnergizados.has(t.id)
         ? resolverColorTramo(t, alimentadores, elementos)
-        : "#6b7280",
+        : "#6b7280", // gris: sin tensión
     }));
   }, [tramos, alimentadores, elementos, energizacion]);
 
@@ -126,7 +133,7 @@ export default function MapaPage() {
   }
 
   function handleClickMapa(coords: { lat: number; lng: number; radioSnapMetros?: number }) {
-    if (modoConectar) return;
+    if (modoConectar) return; // acá solo interesan los toques sobre elementos
 
     if (modoAltaElemento) {
       setUbicacionNuevoElemento(coords);
@@ -136,12 +143,14 @@ export default function MapaPage() {
     }
 
     if (modoTrazado) {
-      const resultado = buscarPuntoDeSnap(
-        coords,
-        elementos.map((e) => ({ lat: e.lat, lng: e.lng })),
-        tramos,
-        coords.radioSnapMetros ?? UMBRAL_SNAP_METROS_DEFECTO
-      );
+      const resultado = pegadoActivo
+        ? buscarPuntoDeSnap(
+            coords,
+            elementos.map((e) => ({ lat: e.lat, lng: e.lng })),
+            tramos,
+            coords.radioSnapMetros ?? UMBRAL_SNAP_METROS_DEFECTO
+          )
+        : null;
       const nuevo: PuntoTrazado = resultado
         ? {
             coord: [resultado.punto.lng, resultado.punto.lat],
@@ -153,6 +162,8 @@ export default function MapaPage() {
     }
   }
 
+  // Qué hacer cuando se toca un elemento (marcador) en el mapa, según
+  // el modo activo.
   function handleTocarElemento(elemento: ElementoEstado) {
     if (modoConectar) {
       if (!origenConectar) {
@@ -218,6 +229,10 @@ export default function MapaPage() {
     setPuntosTrazadoInfo((prev) => prev.slice(0, -1));
   }
 
+  // Al guardar un tramo nuevo, si alguno de sus puntos quedó "empalmado"
+  // en el medio de un tramo viejo, hay que partir ese tramo viejo
+  // insertándole el vértice nuevo — si no, la unión queda solo visual
+  // (dos líneas que pasan cerca) y no una conexión real en los datos.
   async function aplicarEmpalmesPendientes() {
     const porTramo = new Map<string, EmpalmePendiente[]>();
     for (const p of puntosTrazadoInfo) {
@@ -232,6 +247,8 @@ export default function MapaPage() {
       if (!tramoViejo) continue;
 
       const nuevosPuntos = [...tramoViejo.puntos];
+      // Insertar de mayor a menor índice para no invalidar los índices
+      // ya calculados a medida que se insertan los anteriores.
       const puntoDelEmpalme = (e: EmpalmePendiente) =>
         puntosTrazadoInfo.find((p) => p.empalme === e)!.coord;
 
@@ -329,7 +346,7 @@ export default function MapaPage() {
         <div className="fixed bottom-4 inset-x-4 z-20 bg-panel-raised border border-panel-border rounded-xl shadow-lg p-3">
           <p className="text-sm text-slate-300 mb-1">
             {puntosTrazadoInfo.length === 0
-              ? "Tocá el mapa, un elemento, o cualquier punto de otra línea para arrancar desde ahí."
+              ? "Tocá el mapa, un elemento, o cualquier punto de otra línea para arrancar desde ahí. Si hay líneas de otro alimentador cerca, apagá el pegado abajo."
               : `${puntosTrazadoInfo.length} punto${puntosTrazadoInfo.length !== 1 ? "s" : ""} · verde = conectado, naranja = suelto`}
           </p>
           {puntosTrazadoInfo.length > 0 && (
@@ -358,6 +375,18 @@ export default function MapaPage() {
               })()}
             </p>
           )}
+          <button
+            onClick={() => setPegadoActivo((v) => !v)}
+            className={`w-full h-8 mb-2 rounded-lg text-xs font-semibold border ${
+              pegadoActivo
+                ? "bg-estado-cerrado/20 border-estado-cerrado text-estado-cerrado"
+                : "bg-estado-abierto/20 border-estado-abierto text-estado-abierto"
+            }`}
+          >
+            {pegadoActivo
+              ? "🧲 Pegado activado — tocalo para apagarlo (líneas cercanas de otro alimentador)"
+              : "🧲 Pegado apagado — tocalo para volver a activarlo"}
+          </button>
           <div className="flex items-center gap-2">
             <button
               onClick={handleDeshacerPunto}

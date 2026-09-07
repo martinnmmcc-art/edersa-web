@@ -141,13 +141,14 @@ export function buscarSegmentoMasCercano(
 
 /**
  * Punto de "pegado" al trazar, considerando TODO lo que puede conectar:
- * 1. Elementos existentes (match exacto).
- * 2. Vértices de tramos ya trazados (match exacto).
- * 3. CUALQUIER punto a lo largo de un tramo, no solo sus vértices — acá
- *    es donde antes fallaba: tocar el medio de una línea no la unía a
- *    nada. Si el punto cae acá, se devuelve el `empalme` necesario para
- *    partir el tramo viejo en ese punto exacto (así queda una unión
- *    real, no solo dos líneas que pasan cerca).
+ * elementos, vértices de tramos ya trazados, y cualquier punto a lo
+ * largo de un tramo (no solo sus vértices).
+ *
+ * Importante: compara TODOS los candidatos por distancia real y se
+ * queda con el más cercano — antes priorizaba ciegamente cualquier
+ * vértice existente dentro del radio aunque hubiera un punto bastante
+ * más cerca sobre otra línea, lo que hacía "saltar" el pegado a un
+ * lugar más lejano del que el operario realmente estaba tocando.
  */
 export function buscarPuntoDeSnap(
   click: Punto,
@@ -155,15 +156,20 @@ export function buscarPuntoDeSnap(
   tramos: TramoParaSnap[],
   umbralMetros: number
 ): ResultadoSnap | null {
+  let mejor: ResultadoSnap | null = null;
+  let mejorDistancia = umbralMetros;
+
   const vertices: Punto[] = [
     ...puntosElementos,
     ...tramos.flatMap((t) => t.puntos.map(([lng, lat]) => ({ lat, lng }))),
   ];
-  const exacto = buscarPuntoCercano(click, vertices, umbralMetros);
-  if (exacto) return { punto: exacto, empalme: null };
-
-  let mejor: ResultadoSnap | null = null;
-  let mejorDistancia = umbralMetros;
+  for (const v of vertices) {
+    const d = distanciaMetros(click, v);
+    if (d <= mejorDistancia) {
+      mejorDistancia = d;
+      mejor = { punto: v, empalme: null };
+    }
+  }
 
   for (const tramo of tramos) {
     for (let i = 0; i < tramo.puntos.length - 1; i++) {
