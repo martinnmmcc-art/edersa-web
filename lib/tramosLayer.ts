@@ -14,30 +14,54 @@ const CAPA_PREVIEW_PUNTOS_NUM = "trazado-preview-puntos-numero";
 const ZOOM_INICIO_BT = 15;
 const ZOOM_BT_TOTALMENTE_VISIBLE = 16.5;
 
-function tramosAGeoJSON(tramos: TramoLinea[]) {
-  return {
-    type: "FeatureCollection" as const,
-    features: tramos
-      .filter((t) => t.puntos.length >= 2) // una línea necesita al menos 2 puntos
-      .map((t) => ({
-      type: "Feature" as const,
-      properties: {
-        id: t.id,
-        nombre: t.nombre ?? "",
-        tension: t.tension,
-        alimentador_id: t.alimentador_id ?? "",
-        alimentador_id_b: t.alimentador_id_b ?? "",
-        elemento_frontera_id: t.elemento_frontera_id ?? "",
-        color: t.color || (t.tension === "MT" ? "#facc15" : "#38bdf8"),
-      },
-      geometry: { type: "LineString" as const, coordinates: t.puntos },
-    })),
-  };
+function tramosAGeoJSON(tramos: TramoLinea[], segmentosEnergizados: Set<string>) {
+  const features: any[] = [];
+
+  for (const t of tramos) {
+    if (t.puntos.length < 2) continue; // una línea necesita al menos 2 puntos
+
+    const colorSiEnergizado =
+      t.color || (t.tension === "MT" ? "#facc15" : "#38bdf8");
+
+    // Un "Feature" por SEGMENTO (par de puntos consecutivos), no uno
+    // por tramo entero — así, si el corte cae en el medio de un tramo
+    // largo, solo se pone gris la parte que sigue después del corte,
+    // no la línea completa.
+    for (let i = 0; i < t.puntos.length - 1; i++) {
+      const energizado = segmentosEnergizados.has(`${t.id}::${i}`);
+      features.push({
+        type: "Feature" as const,
+        properties: {
+          id: t.id,
+          nombre: t.nombre ?? "",
+          tension: t.tension,
+          alimentador_id: t.alimentador_id ?? "",
+          alimentador_id_b: t.alimentador_id_b ?? "",
+          elemento_frontera_id: t.elemento_frontera_id ?? "",
+          color: energizado ? colorSiEnergizado : "#6b7280",
+        },
+        geometry: {
+          type: "LineString" as const,
+          coordinates: [t.puntos[i], t.puntos[i + 1]],
+        },
+      });
+    }
+  }
+
+  return { type: "FeatureCollection" as const, features };
 }
 
-/** Agrega (o actualiza si ya existe) la capa de tramos guardados. */
-export function dibujarTramos(map: MLMap, tramos: TramoLinea[]) {
-  const data = tramosAGeoJSON(tramos);
+/**
+ * Agrega (o actualiza si ya existe) la capa de tramos guardados.
+ * `segmentosEnergizados` viene de `calcularEnergizacion` (lib/energizacion.ts)
+ * y decide el color segmento por segmento, no tramo por tramo entero.
+ */
+export function dibujarTramos(
+  map: MLMap,
+  tramos: TramoLinea[],
+  segmentosEnergizados: Set<string> = new Set()
+) {
+  const data = tramosAGeoJSON(tramos, segmentosEnergizados);
   const fuente = map.getSource(FUENTE_TRAMOS) as GeoJSONSource | undefined;
 
   if (fuente) {

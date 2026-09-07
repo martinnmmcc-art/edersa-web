@@ -22,6 +22,7 @@ interface MapViewProps {
   puntosConectados?: boolean[];
   onSeleccionarTramo?: (tramo: TramoSeleccionado) => void;
   elementosEnergizadosIds?: Set<string>;
+  segmentosEnergizados?: Set<string>;
   // Cuando hay un modo especial activo (trazado, conectar, alta de
   // elemento), tocar una línea existente tiene que darle al padre la
   // coordenada real del toque (para poder empalmar ahí), no abrir la
@@ -42,6 +43,7 @@ export function MapView({
   puntosConectados = [],
   onSeleccionarTramo,
   elementosEnergizadosIds,
+  segmentosEnergizados = new Set(),
   modoEspecialActivo = false,
 }: MapViewProps) {
   const { map, mapListo, errorMapa, modoMapa, cambiarModoMapa } = useMap({
@@ -49,6 +51,7 @@ export function MapView({
   });
   const marcadoresRef = useRef<Map<string, maplibregl.Marker>>(new Map());
   const tramosRef = useRef<TramoLinea[]>([]);
+  const segmentosEnergizadosRef = useRef<Set<string>>(new Set());
   const puntosTrazadoRef = useRef<[number, number][]>([]);
   const puntosConectadosRef = useRef<boolean[]>([]);
   const onSeleccionarTramoRef = useRef(onSeleccionarTramo);
@@ -188,9 +191,10 @@ export function MapView({
 
   useEffect(() => {
     tramosRef.current = tramos;
+    segmentosEnergizadosRef.current = segmentosEnergizados;
     if (!map || !mapListo) return;
-    dibujarTramos(map, tramos);
-  }, [map, mapListo, tramos]);
+    dibujarTramos(map, tramos, segmentosEnergizados);
+  }, [map, mapListo, tramos, segmentosEnergizados]);
 
   useEffect(() => {
     puntosTrazadoRef.current = puntosTrazado;
@@ -202,7 +206,7 @@ export function MapView({
   useEffect(() => {
     if (!map) return;
     const reagregar = () => {
-      dibujarTramos(map, tramosRef.current);
+      dibujarTramos(map, tramosRef.current, segmentosEnergizadosRef.current);
       dibujarPreviewTrazado(map, puntosTrazadoRef.current, puntosConectadosRef.current);
     };
     map.on("style.load", reagregar);

@@ -110,13 +110,17 @@ export default function MapaPage() {
   );
 
   const tramosParaMapa = useMemo(() => {
+    // El color acá es "el que le corresponde a este tramo SI tiene
+    // tensión" (según alimentador/anillo) — el gris por falta de
+    // tensión ya no se decide acá, se decide segmento por segmento en
+    // dibujarTramos usando energizacion.segmentosEnergizados. Antes se
+    // pintaba TODO el tramo con un solo color, y un corte en el medio
+    // de una línea larga dejaba todo el resto (mal) con color.
     return tramos.map((t) => ({
       ...t,
-      color: energizacion.tramosEnergizados.has(t.id)
-        ? resolverColorTramo(t, alimentadores, elementos)
-        : "#6b7280", // gris: sin tensión
+      color: resolverColorTramo(t, alimentadores, elementos),
     }));
-  }, [tramos, alimentadores, elementos, energizacion]);
+  }, [tramos, alimentadores, elementos]);
 
   const puntosTrazado = useMemo(
     () => puntosTrazadoInfo.map((p) => p.coord),
@@ -288,6 +292,7 @@ export default function MapaPage() {
         puntosConectados={puntosConectados}
         onSeleccionarTramo={handleSeleccionarTramo}
         elementosEnergizadosIds={energizacion.elementosEnergizados}
+        segmentosEnergizados={energizacion.segmentosEnergizados}
         modoEspecialActivo={modoEspecialActivo}
       />
 

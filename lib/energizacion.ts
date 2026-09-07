@@ -5,33 +5,43 @@ import type { ElementoEstado, TramoLinea } from "@/types";
 // siempre inyectan energía (si existen en el mapa).
 const TIPOS_FUENTE_AUTOMATICA = new Set(["barra", "central_termica"]);
 
-// Precisión para matchear coordenadas como "el mismo punto". Con el
-// snapping de 15m al trazar, dos puntos que deberían tocarse quedan con
-// las mismas coordenadas exactas, así que esto es solo para absorber
-// el redondeo de punto flotante, no para "acercar" puntos distintos.
 function clave(lat: number, lng: number): string {
   return `${lat.toFixed(6)},${lng.toFixed(6)}`;
+}
+
+/** Clave de un SEGMENTO puntual (no de todo el tramo): tramoId + índice. */
+function claveSegmento(tramoId: string, indice: number): string {
+  return `${tramoId}::${indice}`;
 }
 
 interface Arista {
   destino: string;
   tramoId: string;
+  segmentoIndice: number;
 }
 
 export interface ResultadoEnergizacion {
-  tramosEnergizados: Set<string>;
+  // Antes esto marcaba el TRAMO entero como energizado apenas UNO de
+  // sus segmentos tenía tensión — el bug real: un tramo largo con el
+  // corte en el medio se pintaba entero con color, en vez de solo la
+  // mitad que realmente tiene tensión. Ahora se trackea por segmento
+  // individual (cada tramo puede tener docenas, uno entre cada par de
+  // puntos consecutivos).
+  segmentosEnergizados: Set<string>;
   elementosEnergizados: Set<string>;
 }
 
 /**
- * Recorre el grafo de la red (tramos como aristas, sus puntos como
- * nodos) desde cada elemento marcado como fuente, y devuelve qué
- * tramos y elementos quedan "con tensión" en este momento.
+ * Recorre el grafo de la red (cada segmento entre dos puntos
+ * consecutivos de un tramo es una arista, sus puntos son los nodos)
+ * desde cada elemento marcado como fuente, y devuelve qué segmentos y
+ * elementos quedan "con tensión" en este momento.
  *
  * Un interruptor (reconectador/seccionador/cuchilla/omnirouter) que
  * está ABIERTO corta el recorrido en su punto: él mismo queda
  * energizado (le llega tensión hasta ahí) pero nada más allá de él, en
- * esa dirección, se marca como energizado.
+ * esa dirección, se marca como energizado — y eso incluye el resto del
+ * MISMO tramo si el corte cae en el medio de su recorrido.
  */
 export function calcularEnergizacion(
   tramos: TramoLinea[],
@@ -39,9 +49,9 @@ export function calcularEnergizacion(
 ): ResultadoEnergizacion {
   const adyacencia = new Map<string, Arista[]>();
 
-  function agregarArista(a: string, b: string, tramoId: string) {
+  function agregarArista(a: string, b: string, tramoId: string, segmentoIndice: number) {
     if (!adyacencia.has(a)) adyacencia.set(a, []);
-    adyacencia.get(a)!.push({ destino: b, tramoId });
+    adyacencia.get(a)!.push({ destino: b, tramoId, segmentoIndice });
   }
 
   for (const tramo of tramos) {
@@ -50,8 +60,8 @@ export function calcularEnergizacion(
       const [lngB, latB] = tramo.puntos[i + 1];
       const a = clave(latA, lngA);
       const b = clave(latB, lngB);
-      agregarArista(a, b, tramo.id);
-      agregarArista(b, a, tramo.id);
+      agregarArista(a, b, tramo.id, i);
+      agregarArista(b, a, tramo.id, i);
     }
   }
 
@@ -78,7 +88,7 @@ export function calcularEnergizacion(
   }
 
   const verticesEnergizados = new Set<string>();
-  const tramosEnergizados = new Set<string>();
+  const segmentosEnergizados = new Set<string>();
   const cola: string[] = [];
 
   for (const f of fuentes) {
@@ -98,7 +108,10 @@ export function calcularEnergizacion(
 
     const vecinos = adyacencia.get(actual) ?? [];
     for (const arista of vecinos) {
-      tramosEnergizados.add(arista.tramoId);
+      // Se marca el SEGMENTO puntual, no todo el tramo — así un corte
+      // en el medio de una línea larga solo apaga lo que sigue después
+      // del corte, no la línea completa.
+      segmentosEnergizados.add(claveSegmento(arista.tramoId, arista.segmentoIndice));
       if (!verticesEnergizados.has(arista.destino)) {
         verticesEnergizados.add(arista.destino);
         cola.push(arista.destino);
@@ -113,5 +126,5 @@ export function calcularEnergizacion(
     }
   }
 
-  return { tramosEnergizados, elementosEnergizados };
+  return { segmentosEnergizados, elementosEnergizados };
 }
