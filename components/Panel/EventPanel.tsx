@@ -53,6 +53,17 @@ export function EventPanel({
   const [confirmandoBaja, setConfirmandoBaja] = useState(false);
   const [soldando, setSoldando] = useState(false);
   const [mensajeSoldadura, setMensajeSoldadura] = useState<string | null>(null);
+  const [confirmandoCierreAnillo, setConfirmandoCierreAnillo] = useState(false);
+
+  const esAnilloConDosFuentes = elemento.es_punto_anillo && Boolean(elemento.alimentador_id_b);
+
+  function handleClickCerrar() {
+    if (esAnilloConDosFuentes) {
+      setConfirmandoCierreAnillo(true);
+      return;
+    }
+    handleRegistrar("cierre");
+  }
 
   async function handleRegistrar(tipo: "apertura" | "cierre") {
     setEnviando(tipo);
@@ -367,13 +378,47 @@ export function EventPanel({
                 {enviando === "apertura" ? "Guardando…" : "ABRIR"}
               </button>
               <button
-                onClick={() => handleRegistrar("cierre")}
+                onClick={handleClickCerrar}
                 disabled={enviando !== null}
                 className="h-16 rounded-xl bg-estado-cerrado text-white font-display text-2xl tracking-wide disabled:opacity-50 active:scale-95 transition"
               >
                 {enviando === "cierre" ? "Guardando…" : "CERRAR"}
               </button>
             </div>
+
+            {confirmandoCierreAnillo && (
+              <div className="mt-3 border border-acento rounded-xl p-3 bg-acento/10">
+                <p className="text-sm text-slate-100 font-semibold mb-1">
+                  ⚠️ Punto de anillo entre dos fuentes
+                </p>
+                <p className="text-xs text-slate-300 mb-3">
+                  Este punto une <strong>{elemento.alimentador_nombre ?? "el alimentador principal"}</strong> con{" "}
+                  <strong>{elemento.alimentador_b_nombre}</strong>. Si los dos lados ya tienen tensión
+                  desde fuentes distintas (por ejemplo la central térmica de un lado y
+                  Chipre/interconectado del otro), cerrarlo los pone en paralelo sin
+                  sincronizar — antes de cerrar, confirmá en campo que uno de los dos
+                  lados esté realmente sin tensión.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setConfirmandoCierreAnillo(false)}
+                    className="flex-1 h-touch rounded-lg border border-panel-border text-slate-300 text-sm"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setConfirmandoCierreAnillo(false);
+                      handleRegistrar("cierre");
+                    }}
+                    disabled={enviando !== null}
+                    className="flex-1 h-touch rounded-lg bg-estado-cerrado text-white text-sm font-semibold disabled:opacity-50"
+                  >
+                    Ya lo verifiqué, cerrar igual
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
 

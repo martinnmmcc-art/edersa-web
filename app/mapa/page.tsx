@@ -38,6 +38,12 @@ const TODOS_LOS_TIPOS: TipoElemento[] = [
 // calculado dinámicamente según el zoom (ver MapView.tsx).
 const UMBRAL_SNAP_METROS_DEFECTO = 10;
 
+// Radio para soldar automáticamente un elemento RECIÉN CREADO a la
+// línea más cercana. Más generoso que el de trazado porque acá es una
+// ubicación puesta a propósito (con "+ Elemento"), no un tap rápido
+// mientras se traza.
+const UMBRAL_AUTOSOLDAR_METROS = 20;
+
 interface PuntoTrazado {
   coord: [number, number]; // [lng, lat]
   conectado: boolean;
@@ -419,6 +425,7 @@ export default function MapaPage() {
 
       {elementoSeleccionado && (
         <EventPanel
+          key={elementoSeleccionado.id}
           elemento={elementoSeleccionado}
           usuario={usuario}
           alimentadores={alimentadores}
@@ -447,7 +454,7 @@ export default function MapaPage() {
               const resultado = buscarSegmentoMasCercano(
                 ubicacionNuevoElemento,
                 tramos,
-                UMBRAL_SNAP_METROS_DEFECTO
+                UMBRAL_AUTOSOLDAR_METROS
               );
               if (resultado) {
                 const tramoViejo = tramos.find((t) => t.id === resultado.tramoId);
