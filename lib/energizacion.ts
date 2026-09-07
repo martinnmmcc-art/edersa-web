@@ -65,7 +65,9 @@ export function calcularEnergizacion(
   function verticeBloqueado(k: string): boolean {
     const els = elementosPorVertice.get(k);
     if (!els) return false;
-    return els.some((e) => TIPOS_INTERRUPTOR.has(e.tipo) && e.estado === "abierto");
+    return els.some(
+      (e) => TIPOS_INTERRUPTOR.has(e.tipo) && e.estado === "abierto" && e.corta_circuito
+    );
   }
 
   const fuentes: string[] = [];

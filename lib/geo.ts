@@ -89,6 +89,37 @@ export interface ResultadoSnap {
 }
 
 /**
+ * Busca el tramo/segmento más cercano a un punto que YA EXISTE (por
+ * ejemplo, un elemento ya cargado) — para "soldarlo" a esa línea sin
+ * moverlo. A diferencia de `buscarPuntoDeSnap`, acá el punto que se va
+ * a insertar en el tramo viejo es el mismo `punto` de entrada (no uno
+ * proyectado), porque el objetivo es unir el elemento tal cual está,
+ * no correrlo a la línea.
+ */
+export function buscarSegmentoMasCercano(
+  punto: Punto,
+  tramos: TramoParaSnap[],
+  umbralMetros: number
+): EmpalmePendiente | null {
+  let mejor: EmpalmePendiente | null = null;
+  let mejorDistancia = umbralMetros;
+
+  for (const tramo of tramos) {
+    for (let i = 0; i < tramo.puntos.length - 1; i++) {
+      const [lngA, latA] = tramo.puntos[i];
+      const [lngB, latB] = tramo.puntos[i + 1];
+      const proy = proyectarPuntoEnSegmento(punto, { lat: latA, lng: lngA }, { lat: latB, lng: lngB });
+      if (proy.distancia <= mejorDistancia) {
+        mejorDistancia = proy.distancia;
+        mejor = { tramoId: tramo.id, segmentoIndice: i };
+      }
+    }
+  }
+
+  return mejor;
+}
+
+/**
  * Punto de "pegado" al trazar, considerando TODO lo que puede conectar:
  * 1. Elementos existentes (match exacto).
  * 2. Vértices de tramos ya trazados (match exacto).

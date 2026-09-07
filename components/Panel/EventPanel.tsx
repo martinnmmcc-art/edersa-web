@@ -6,9 +6,11 @@ import {
   actualizarElemento,
   darDeBajaElemento,
 } from "@/services/elementosService";
+import { actualizarPuntosTramo } from "@/services/tramosService";
+import { buscarSegmentoMasCercano } from "@/lib/geo";
 import { COLOR_ESTADO, LABEL_ESTADO, LABEL_TIPO, TIPOS_SIN_MANIOBRA, TIPOS_INTERRUPTOR } from "@/lib/estado";
 import { SalidasBTPanel } from "./SalidasBTPanel";
-import type { Alimentador, ElementoEstado, TipoMotivo } from "@/types";
+import type { Alimentador, ElementoEstado, TipoMotivo, TramoLinea } from "@/types";
 
 const MOTIVOS: { valor: TipoMotivo; label: string }[] = [
   { valor: "preventivo", label: "Preventivo" },
@@ -19,26 +21,38 @@ const MOTIVOS: { valor: TipoMotivo; label: string }[] = [
   { valor: "otro", label: "Otro" },
 ];
 
+// Radio fijo y generoso para "soldar" un elemento ya existente a la
+// línea más cercana. Es una acción manual y explícita (el operario la
+// dispara a propósito), así que conviene que sea tolerante — a
+// diferencia del trazado, acá no tenemos el zoom actual para ajustarlo.
+const UMBRAL_SOLDAR_METROS = 30;
+
 interface EventPanelProps {
   elemento: ElementoEstado;
   usuario: string;
   alimentadores: Alimentador[];
+  tramos: TramoLinea[];
   onCerrarPanel: () => void;
   onEventoRegistrado: (offline: boolean) => void;
+  onReconectado: () => void;
 }
 
 export function EventPanel({
   elemento,
   usuario,
   alimentadores,
+  tramos,
   onCerrarPanel,
   onEventoRegistrado,
+  onReconectado,
 }: EventPanelProps) {
   const [enviando, setEnviando] = useState<"apertura" | "cierre" | null>(null);
   const [motivo, setMotivo] = useState<TipoMotivo>("preventivo");
   const [editando, setEditando] = useState(false);
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
   const [confirmandoBaja, setConfirmandoBaja] = useState(false);
+  const [soldando, setSoldando] = useState(false);
+  const [mensajeSoldadura, setMensajeSoldadura] = useState<string | null>(null);
 
   async function handleRegistrar(tipo: "apertura" | "cierre") {
     setEnviando(tipo);
@@ -64,6 +78,7 @@ export function EventPanel({
     const alimentador_id_b = (form.get("alimentador_id_b") as string) || null;
     const es_fuente = form.get("es_fuente") === "on";
     const es_punto_anillo = form.get("es_punto_anillo") === "on";
+    const corta_circuito = form.get("corta_circuito") === "on";
     if (nombre.length < 2) return;
 
     setGuardandoEdicion(true);
@@ -74,6 +89,7 @@ export function EventPanel({
         alimentador_id_b,
         es_fuente,
         es_punto_anillo,
+        corta_circuito,
       });
       onEventoRegistrado(false);
       onCerrarPanel();
@@ -90,6 +106,35 @@ export function EventPanel({
       onCerrarPanel();
     } finally {
       setGuardandoEdicion(false);
+    }
+  }
+
+  async function handleSoldar() {
+    setSoldando(true);
+    setMensajeSoldadura(null);
+    try {
+      const resultado = buscarSegmentoMasCercano(
+        { lat: elemento.lat, lng: elemento.lng },
+        tramos,
+        UMBRAL_SOLDAR_METROS
+      );
+      if (!resultado) {
+        setMensajeSoldadura(
+          `No encontré ninguna línea a menos de ${UMBRAL_SOLDAR_METROS}m.`
+        );
+        return;
+      }
+      const tramoViejo = tramos.find((t) => t.id === resultado.tramoId);
+      if (!tramoViejo) return;
+
+      const nuevosPuntos = [...tramoViejo.puntos];
+      nuevosPuntos.splice(resultado.segmentoIndice + 1, 0, [elemento.lng, elemento.lat]);
+      await actualizarPuntosTramo(resultado.tramoId, nuevosPuntos);
+
+      setMensajeSoldadura("✅ Unido a la línea sin mover el elemento.");
+      onReconectado();
+    } finally {
+      setSoldando(false);
     }
   }
 
@@ -140,15 +185,32 @@ export function EventPanel({
           </label>
 
           {TIPOS_INTERRUPTOR.has(elemento.tipo) && (
-            <label className="flex items-center gap-2 text-sm text-slate-300">
-              <input
-                type="checkbox"
-                name="es_punto_anillo"
-                defaultChecked={elemento.es_punto_anillo}
-                className="w-5 h-5"
-              />
-              Es un punto de anillo (abierto es su estado normal)
-            </label>
+            <>
+              <label className="flex items-center gap-2 text-sm text-slate-300">
+                <input
+                  type="checkbox"
+                  name="es_punto_anillo"
+                  defaultChecked={elemento.es_punto_anillo}
+                  className="w-5 h-5"
+                />
+                Es un punto de anillo (abierto es su estado normal)
+              </label>
+
+              <label className="flex items-center gap-2 text-sm text-slate-300">
+                <input
+                  type="checkbox"
+                  name="corta_circuito"
+                  defaultChecked={elemento.corta_circuito}
+                  className="w-5 h-5"
+                />
+                Corta la línea de MT si está abierto
+              </label>
+              <span className="text-xs text-slate-500 -mt-2">
+                Destildalo para acometidas/derivaciones privadas (ej: entrada
+                de un hospital) — son un ramal aparte, así que aunque estén
+                abiertas no deben cortar el trazado de media tensión.
+              </span>
+            </>
           )}
 
           {elemento.tipo === "omnirouter" && (
@@ -248,6 +310,11 @@ export function EventPanel({
                 🔄 Punto de anillo — abierto es su estado normal
               </p>
             )}
+            {TIPOS_INTERRUPTOR.has(elemento.tipo) && !elemento.corta_circuito && (
+              <p className="text-xs mt-1 text-slate-400 font-semibold">
+                🏥 Acometida privada — no corta la MT aunque esté abierto
+              </p>
+            )}
             {elemento.alimentador_b_nombre && (
               <p className="text-xs mt-1 text-acento font-semibold">
                 🔗 Anilla: {elemento.alimentador_nombre} ↔ {elemento.alimentador_b_nombre}
@@ -315,8 +382,19 @@ export function EventPanel({
         )}
 
         <button
+          onClick={handleSoldar}
+          disabled={soldando}
+          className="w-full h-touch mt-3 rounded-xl border border-acento text-acento text-sm font-semibold disabled:opacity-50"
+        >
+          {soldando ? "Buscando línea…" : "🔧 Unir a la línea más cercana"}
+        </button>
+        {mensajeSoldadura && (
+          <p className="text-xs text-slate-400 mt-2 text-center">{mensajeSoldadura}</p>
+        )}
+
+        <button
           onClick={() => setEditando(true)}
-          className="w-full h-touch mt-3 rounded-xl border border-panel-border text-slate-300 text-sm"
+          className="w-full h-touch mt-2 rounded-xl border border-panel-border text-slate-300 text-sm"
         >
           Editar nombre / alimentador
         </button>

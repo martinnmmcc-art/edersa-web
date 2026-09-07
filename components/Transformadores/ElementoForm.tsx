@@ -51,6 +51,7 @@ export function ElementoForm({
     const alimentador_id_b = (form.get("alimentador_id_b") as string) || null;
     const es_fuente = form.get("es_fuente") === "on";
     const es_punto_anillo = form.get("es_punto_anillo") === "on";
+    const corta_circuito = form.get("corta_circuito") === "on";
 
     if (Number.isNaN(lat) || Number.isNaN(lng)) {
       setErrorMsg("Ubicación inválida. Tocá el mapa para fijar el punto.");
@@ -104,6 +105,7 @@ export function ElementoForm({
           alimentador_id_b,
           es_fuente,
           es_punto_anillo,
+          corta_circuito,
           lat,
           lng,
         });
@@ -191,6 +193,21 @@ export function ElementoForm({
                 para anillar/transferir carga). Así no va a aparecer en las
                 alertas de "abierto" del mapa cuando esté en su posición
                 normal.
+              </span>
+
+              <label className="flex items-center gap-2 text-sm text-slate-300">
+                <input
+                  type="checkbox"
+                  name="corta_circuito"
+                  defaultChecked
+                  className="w-5 h-5"
+                />
+                Corta la línea de MT si está abierto
+              </label>
+              <span className="text-xs text-slate-500 -mt-2">
+                Destildalo para acometidas/derivaciones privadas (ej: entrada
+                de un hospital) — al estar abiertas no cortan el trazado de
+                media tensión, es un ramal aparte.
               </span>
             </>
           )}

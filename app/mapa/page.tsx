@@ -17,7 +17,7 @@ import { useUsuarioLocal } from "@/hooks/useUsuarioLocal";
 import { useTramos } from "@/hooks/useTramos";
 import { obtenerAlimentadores } from "@/services/elementosService";
 import { actualizarPuntosTramo } from "@/services/tramosService";
-import { buscarPuntoDeSnap, type EmpalmePendiente } from "@/lib/geo";
+import { buscarPuntoDeSnap, buscarSegmentoMasCercano, type EmpalmePendiente } from "@/lib/geo";
 import { resolverColorTramo } from "@/lib/anillado";
 import { calcularEnergizacion } from "@/lib/energizacion";
 import type { Alimentador, ElementoEstado, TipoElemento } from "@/types";
@@ -40,12 +40,6 @@ const UMBRAL_SNAP_METROS_DEFECTO = 15;
 
 interface PuntoTrazado {
   coord: [number, number]; // [lng, lat]
-  conectado: boolean;
-  empalme: EmpalmePendiente | null;
-}
-
-interface PuntoTrazado {
-  coord: [number, number];
   conectado: boolean;
   empalme: EmpalmePendiente | null;
 }
@@ -87,7 +81,9 @@ export default function MapaPage() {
   useEffect(() => {
     obtenerAlimentadores()
       .then((data) => setAlimentadores(data as Alimentador[]))
-      .catch(() => {});
+      .catch(() => {
+        /* si falla (ej. offline), simplemente no se muestran filtros por alimentador */
+      });
   }, []);
 
   const elementosFiltrados = useMemo(() => {
@@ -343,11 +339,37 @@ export default function MapaPage() {
 
       {modoTrazado && (
         <div className="fixed bottom-4 inset-x-4 z-20 bg-panel-raised border border-panel-border rounded-xl shadow-lg p-3">
-          <p className="text-sm text-slate-300 mb-2">
+          <p className="text-sm text-slate-300 mb-1">
             {puntosTrazadoInfo.length === 0
               ? "Tocá el mapa, un elemento, o cualquier punto de otra línea para arrancar desde ahí."
-              : `${puntosTrazadoInfo.length} punto${puntosTrazadoInfo.length !== 1 ? "s" : ""} · verde = conectado a algo real, naranja = suelto`}
+              : `${puntosTrazadoInfo.length} punto${puntosTrazadoInfo.length !== 1 ? "s" : ""} · verde = conectado, naranja = suelto`}
           </p>
+          {puntosTrazadoInfo.length > 0 && (
+            <p className="text-xs mb-2 font-semibold">
+              {(() => {
+                const ultimo = puntosTrazadoInfo[puntosTrazadoInfo.length - 1];
+                if (ultimo.empalme) {
+                  return (
+                    <span className="text-estado-cerrado">
+                      ✂️ Último punto: va a partir una línea existente para unirse ahí.
+                    </span>
+                  );
+                }
+                if (ultimo.conectado) {
+                  return (
+                    <span className="text-estado-cerrado">
+                      ✅ Último punto: pegado exacto a un elemento o vértice ya existente.
+                    </span>
+                  );
+                }
+                return (
+                  <span className="text-acento">
+                    ⚠️ Último punto: quedó suelto, no detectó nada cerca para unir.
+                  </span>
+                );
+              })()}
+            </p>
+          )}
           <div className="flex items-center gap-2">
             <button
               onClick={handleDeshacerPunto}
@@ -383,8 +405,10 @@ export default function MapaPage() {
           elemento={elementoSeleccionado}
           usuario={usuario}
           alimentadores={alimentadores}
+          tramos={tramos}
           onCerrarPanel={() => setElementoSeleccionado(null)}
           onEventoRegistrado={() => recargar()}
+          onReconectado={() => recargarTramos()}
         />
       )}
 
@@ -396,7 +420,33 @@ export default function MapaPage() {
             setMostrarFormElemento(false);
             setUbicacionNuevoElemento(null);
           }}
-          onCreado={() => recargar()}
+          onCreado={async () => {
+            // Si el punto donde se creó el elemento cae cerca de una
+            // línea ya trazada, lo "suelda" ahí mismo (sin moverlo) para
+            // que quede realmente conectado desde el primer momento —
+            // esto es justo lo que faltaba y causaba que un seccionador
+            // recién cargado quedara separado de la línea.
+            if (ubicacionNuevoElemento) {
+              const resultado = buscarSegmentoMasCercano(
+                ubicacionNuevoElemento,
+                tramos,
+                UMBRAL_SNAP_METROS_DEFECTO
+              );
+              if (resultado) {
+                const tramoViejo = tramos.find((t) => t.id === resultado.tramoId);
+                if (tramoViejo) {
+                  const nuevosPuntos = [...tramoViejo.puntos];
+                  nuevosPuntos.splice(resultado.segmentoIndice + 1, 0, [
+                    ubicacionNuevoElemento.lng,
+                    ubicacionNuevoElemento.lat,
+                  ]);
+                  await actualizarPuntosTramo(resultado.tramoId, nuevosPuntos);
+                  recargarTramos();
+                }
+              }
+            }
+            recargar();
+          }}
         />
       )}
 
