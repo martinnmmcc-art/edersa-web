@@ -16,7 +16,8 @@ import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { useUsuarioLocal } from "@/hooks/useUsuarioLocal";
 import { useTramos } from "@/hooks/useTramos";
 import { obtenerAlimentadores } from "@/services/elementosService";
-import { buscarPuntoCercano } from "@/lib/geo";
+import { actualizarPuntosTramo } from "@/services/tramosService";
+import { buscarPuntoDeSnap, type EmpalmePendiente } from "@/lib/geo";
 import { resolverColorTramo } from "@/lib/anillado";
 import { calcularEnergizacion } from "@/lib/energizacion";
 import type { Alimentador, ElementoEstado, TipoElemento } from "@/types";
@@ -34,6 +35,12 @@ const TODOS_LOS_TIPOS: TipoElemento[] = [
 ];
 
 const UMBRAL_SNAP_METROS = 15;
+
+interface PuntoTrazado {
+  coord: [number, number];
+  conectado: boolean;
+  empalme: EmpalmePendiente | null;
+}
 
 export default function MapaPage() {
   const { usuario, setUsuario, cargado } = useUsuarioLocal();
@@ -57,8 +64,7 @@ export default function MapaPage() {
   const [mostrarFormElemento, setMostrarFormElemento] = useState(false);
 
   const [modoTrazado, setModoTrazado] = useState(false);
-  const [puntosTrazado, setPuntosTrazado] = useState<[number, number][]>([]);
-  const [puntosConectados, setPuntosConectados] = useState<boolean[]>([]);
+  const [puntosTrazadoInfo, setPuntosTrazadoInfo] = useState<PuntoTrazado[]>([]);
   const [mostrarFormTramo, setMostrarFormTramo] = useState(false);
 
   const [modoConectar, setModoConectar] = useState(false);
@@ -97,13 +103,16 @@ export default function MapaPage() {
     }));
   }, [tramos, alimentadores, elementos, energizacion]);
 
-  const puntosEnganchables = useMemo(() => {
-    const deElementos = elementos.map((e) => ({ lat: e.lat, lng: e.lng }));
-    const deTramos = tramos.flatMap((t) =>
-      t.puntos.map(([lng, lat]) => ({ lat, lng }))
-    );
-    return [...deElementos, ...deTramos];
-  }, [elementos, tramos]);
+  const puntosTrazado = useMemo(
+    () => puntosTrazadoInfo.map((p) => p.coord),
+    [puntosTrazadoInfo]
+  );
+  const puntosConectados = useMemo(
+    () => puntosTrazadoInfo.map((p) => p.conectado),
+    [puntosTrazadoInfo]
+  );
+
+  const modoEspecialActivo = modoAltaElemento || modoTrazado || modoConectar;
 
   function toggleTipo(tipo: TipoElemento) {
     setTiposActivos((prev) => {
@@ -123,11 +132,22 @@ export default function MapaPage() {
       setModoAltaElemento(false);
       return;
     }
+
     if (modoTrazado) {
-      const pegado = buscarPuntoCercano(coords, puntosEnganchables, UMBRAL_SNAP_METROS);
-      const punto = pegado ?? coords;
-      setPuntosTrazado((prev) => [...prev, [punto.lng, punto.lat]]);
-      setPuntosConectados((prev) => [...prev, Boolean(pegado)]);
+      const resultado = buscarPuntoDeSnap(
+        coords,
+        elementos.map((e) => ({ lat: e.lat, lng: e.lng })),
+        tramos,
+        UMBRAL_SNAP_METROS
+      );
+      const nuevo: PuntoTrazado = resultado
+        ? {
+            coord: [resultado.punto.lng, resultado.punto.lat],
+            conectado: true,
+            empalme: resultado.empalme,
+          }
+        : { coord: [coords.lng, coords.lat], conectado: false, empalme: null };
+      setPuntosTrazadoInfo((prev) => [...prev, nuevo]);
     }
   }
 
@@ -138,11 +158,10 @@ export default function MapaPage() {
         return;
       }
       if (origenConectar.id === elemento.id) return;
-      setPuntosTrazado([
-        [origenConectar.lng, origenConectar.lat],
-        [elemento.lng, elemento.lat],
+      setPuntosTrazadoInfo([
+        { coord: [origenConectar.lng, origenConectar.lat], conectado: true, empalme: null },
+        { coord: [elemento.lng, elemento.lat], conectado: true, empalme: null },
       ]);
-      setPuntosConectados([true, true]);
       setModoConectar(false);
       setOrigenConectar(null);
       setMostrarFormTramo(true);
@@ -150,8 +169,10 @@ export default function MapaPage() {
     }
 
     if (modoTrazado) {
-      setPuntosTrazado((prev) => [...prev, [elemento.lng, elemento.lat]]);
-      setPuntosConectados((prev) => [...prev, true]);
+      setPuntosTrazadoInfo((prev) => [
+        ...prev,
+        { coord: [elemento.lng, elemento.lat], conectado: true, empalme: null },
+      ]);
       return;
     }
 
@@ -161,14 +182,13 @@ export default function MapaPage() {
   }
 
   function handleSeleccionarTramo(tramo: TramoSeleccionado) {
-    if (modoAltaElemento || modoTrazado || modoConectar) return;
+    if (modoEspecialActivo) return;
     setTramoSeleccionado(tramo);
   }
 
   function handleActivarTrazado() {
     setModoTrazado(true);
-    setPuntosTrazado([]);
-    setPuntosConectados([]);
+    setPuntosTrazadoInfo([]);
     setModoAltaElemento(false);
     setModoConectar(false);
     setOrigenConectar(null);
@@ -179,14 +199,12 @@ export default function MapaPage() {
     setOrigenConectar(null);
     setModoTrazado(false);
     setModoAltaElemento(false);
-    setPuntosTrazado([]);
-    setPuntosConectados([]);
+    setPuntosTrazadoInfo([]);
   }
 
   function handleCancelarTrazado() {
     setModoTrazado(false);
-    setPuntosTrazado([]);
-    setPuntosConectados([]);
+    setPuntosTrazadoInfo([]);
   }
 
   function handleCancelarConectar() {
@@ -195,8 +213,34 @@ export default function MapaPage() {
   }
 
   function handleDeshacerPunto() {
-    setPuntosTrazado((prev) => prev.slice(0, -1));
-    setPuntosConectados((prev) => prev.slice(0, -1));
+    setPuntosTrazadoInfo((prev) => prev.slice(0, -1));
+  }
+
+  async function aplicarEmpalmesPendientes() {
+    const porTramo = new Map<string, EmpalmePendiente[]>();
+    for (const p of puntosTrazadoInfo) {
+      if (!p.empalme) continue;
+      const lista = porTramo.get(p.empalme.tramoId) ?? [];
+      lista.push(p.empalme);
+      porTramo.set(p.empalme.tramoId, lista);
+    }
+
+    for (const [tramoId, empalmes] of porTramo) {
+      const tramoViejo = tramos.find((t) => t.id === tramoId);
+      if (!tramoViejo) continue;
+
+      const nuevosPuntos = [...tramoViejo.puntos];
+      const puntoDelEmpalme = (e: EmpalmePendiente) =>
+        puntosTrazadoInfo.find((p) => p.empalme === e)!.coord;
+
+      empalmes
+        .sort((a, b) => b.segmentoIndice - a.segmentoIndice)
+        .forEach((e) => {
+          nuevosPuntos.splice(e.segmentoIndice + 1, 0, puntoDelEmpalme(e));
+        });
+
+      await actualizarPuntosTramo(tramoId, nuevosPuntos);
+    }
   }
 
   if (!cargado) return null;
@@ -219,6 +263,7 @@ export default function MapaPage() {
         puntosConectados={puntosConectados}
         onSeleccionarTramo={handleSeleccionarTramo}
         elementosEnergizadosIds={energizacion.elementosEnergizados}
+        modoEspecialActivo={modoEspecialActivo}
       />
 
       <FilterBar
@@ -281,14 +326,14 @@ export default function MapaPage() {
       {modoTrazado && (
         <div className="fixed bottom-4 inset-x-4 z-20 bg-panel-raised border border-panel-border rounded-xl shadow-lg p-3">
           <p className="text-sm text-slate-300 mb-2">
-            {puntosTrazado.length === 0
-              ? "Tocá el mapa o un elemento para marcar el primer punto."
-              : `${puntosTrazado.length} punto${puntosTrazado.length !== 1 ? "s" : ""} · verde = conectado a algo real, naranja = suelto`}
+            {puntosTrazadoInfo.length === 0
+              ? "Tocá el mapa, un elemento, o cualquier punto de otra línea para arrancar desde ahí."
+              : `${puntosTrazadoInfo.length} punto${puntosTrazadoInfo.length !== 1 ? "s" : ""} · verde = conectado a algo real, naranja = suelto`}
           </p>
           <div className="flex items-center gap-2">
             <button
               onClick={handleDeshacerPunto}
-              disabled={puntosTrazado.length === 0}
+              disabled={puntosTrazadoInfo.length === 0}
               className="h-9 px-3 rounded-lg border border-panel-border text-slate-300 text-sm disabled:opacity-40"
             >
               Deshacer
@@ -301,7 +346,7 @@ export default function MapaPage() {
             </button>
             <button
               onClick={() => setMostrarFormTramo(true)}
-              disabled={puntosTrazado.length < 2}
+              disabled={puntosTrazadoInfo.length < 2}
               className="h-9 px-3 rounded-lg bg-acento text-panel font-semibold text-sm disabled:opacity-40 flex-1"
             >
               Guardar tramo
@@ -343,11 +388,11 @@ export default function MapaPage() {
           alimentadores={alimentadores}
           elementos={elementos}
           onCerrar={() => setMostrarFormTramo(false)}
-          onCreado={() => {
+          onCreado={async () => {
+            await aplicarEmpalmesPendientes();
             recargarTramos();
             setModoTrazado(false);
-            setPuntosTrazado([]);
-            setPuntosConectados([]);
+            setPuntosTrazadoInfo([]);
           }}
         />
       )}
