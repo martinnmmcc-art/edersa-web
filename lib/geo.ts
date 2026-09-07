@@ -73,6 +73,25 @@ export function proyectarPuntoEnSegmento(
   return { ...proyectado, distancia: distanciaMetros(p, proyectado) };
 }
 
+/**
+ * Saca puntos duplicados consecutivos de una polilínea (ej: [A,A,B] ->
+ * [A,B]). Evita que se acumulen segmentos de largo cero cuando un
+ * mismo punto se empalma más de una vez en el mismo lugar — eso
+ * confunde la búsqueda de "pegado" en intentos posteriores.
+ */
+export function deduplicarPuntosConsecutivos(
+  puntos: [number, number][]
+): [number, number][] {
+  const resultado: [number, number][] = [];
+  for (const p of puntos) {
+    const anterior = resultado[resultado.length - 1];
+    if (!anterior || anterior[0] !== p[0] || anterior[1] !== p[1]) {
+      resultado.push(p);
+    }
+  }
+  return resultado;
+}
+
 export interface TramoParaSnap {
   id: string;
   puntos: [number, number][]; // [lng, lat][]
@@ -108,6 +127,7 @@ export function buscarSegmentoMasCercano(
     for (let i = 0; i < tramo.puntos.length - 1; i++) {
       const [lngA, latA] = tramo.puntos[i];
       const [lngB, latB] = tramo.puntos[i + 1];
+      if (lngA === lngB && latA === latB) continue; // segmento de largo cero: ignorar
       const proy = proyectarPuntoEnSegmento(punto, { lat: latA, lng: lngA }, { lat: latB, lng: lngB });
       if (proy.distancia <= mejorDistancia) {
         mejorDistancia = proy.distancia;
@@ -149,6 +169,7 @@ export function buscarPuntoDeSnap(
     for (let i = 0; i < tramo.puntos.length - 1; i++) {
       const [lngA, latA] = tramo.puntos[i];
       const [lngB, latB] = tramo.puntos[i + 1];
+      if (lngA === lngB && latA === latB) continue; // segmento de largo cero: ignorar
       const proy = proyectarPuntoEnSegmento(click, { lat: latA, lng: lngA }, { lat: latB, lng: lngB });
       if (proy.distancia <= mejorDistancia) {
         mejorDistancia = proy.distancia;

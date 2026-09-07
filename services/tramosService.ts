@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase/client";
 import { nombreCanalUnico } from "@/lib/realtimeChannel";
+import { deduplicarPuntosConsecutivos } from "@/lib/geo";
 import type { NuevoTramoInput, TramoLinea } from "@/types";
 
 export async function obtenerTramos(): Promise<TramoLinea[]> {
@@ -20,7 +21,7 @@ export async function crearTramo(input: NuevoTramoInput) {
       tension: input.tension,
       nombre: input.nombre || null,
       color: input.color || null,
-      puntos: input.puntos,
+      puntos: deduplicarPuntosConsecutivos(input.puntos),
       alimentador_id_b: input.alimentador_id_b ?? null,
       elemento_frontera_id: input.elemento_frontera_id ?? null,
     })
@@ -57,9 +58,15 @@ export async function darDeBajaTramo(id: string) {
  * para "partir" un tramo viejo cuando un nuevo trazado arranca desde
  * un punto en el medio de su recorrido — así la unión queda real en
  * los datos (comparten un vértice exacto), no solo cerca visualmente.
+ * Deduplica antes de guardar: si el mismo punto se empalma más de una
+ * vez (ej: reintentos de un trazado fallido), no se acumulan
+ * segmentos de largo cero.
  */
 export async function actualizarPuntosTramo(id: string, puntos: [number, number][]) {
-  const { error } = await supabase.from("tramos_linea").update({ puntos }).eq("id", id);
+  const { error } = await supabase
+    .from("tramos_linea")
+    .update({ puntos: deduplicarPuntosConsecutivos(puntos) })
+    .eq("id", id);
   if (error) throw error;
 }
 

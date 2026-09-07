@@ -17,7 +17,9 @@ const ZOOM_BT_TOTALMENTE_VISIBLE = 16.5;
 function tramosAGeoJSON(tramos: TramoLinea[]) {
   return {
     type: "FeatureCollection" as const,
-    features: tramos.map((t) => ({
+    features: tramos
+      .filter((t) => t.puntos.length >= 2) // una línea necesita al menos 2 puntos
+      .map((t) => ({
       type: "Feature" as const,
       properties: {
         id: t.id,
@@ -45,6 +47,7 @@ export function dibujarTramos(map: MLMap, tramos: TramoLinea[]) {
 
   map.addSource(FUENTE_TRAMOS, { type: "geojson", data: data as any });
 
+  // MT: siempre visible, línea llena y gruesa (es la troncal).
   map.addLayer({
     id: CAPA_MT,
     type: "line",
@@ -57,6 +60,8 @@ export function dibujarTramos(map: MLMap, tramos: TramoLinea[]) {
     },
   });
 
+  // Área invisible más ancha debajo de MT, solo para que sea más fácil
+  // tocar la línea con el dedo (4px reales es muy angosto para eso).
   map.addLayer(
     {
       id: `${CAPA_MT}-hitbox`,
@@ -68,6 +73,7 @@ export function dibujarTramos(map: MLMap, tramos: TramoLinea[]) {
     CAPA_MT
   );
 
+  // BT: oculta hasta acercarse y aparece gradualmente.
   map.addLayer({
     id: CAPA_BT,
     type: "line",
