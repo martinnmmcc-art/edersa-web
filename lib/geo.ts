@@ -1,4 +1,4 @@
-interface Punto {
+export interface Punto {
   lat: number;
   lng: number;
 }
@@ -17,10 +17,8 @@ export function distanciaMetros(a: Punto, b: Punto): number {
 
 /**
  * Busca el candidato más cercano a `punto` dentro de `umbralMetros`.
- * Se usa para "pegar" un punto recién tocado a un elemento o a otro
- * tramo ya existente, en vez de dejarlo como una coordenada suelta que
- * casi coincide pero no exactamente (eso es lo que rompe la topología:
- * dos líneas que deberían tocarse pero quedan a 2 metros una de otra).
+ * Se usa para "pegar" un punto recién tocado a un elemento o a un
+ * vértice de otro tramo ya existente.
  */
 export function buscarPuntoCercano(
   punto: Punto,
@@ -35,6 +33,99 @@ export function buscarPuntoCercano(
     if (d <= mejorDistancia) {
       mejorDistancia = d;
       mejor = candidato;
+    }
+  }
+
+  return mejor;
+}
+
+/**
+ * Proyecta `p` sobre el segmento a-b y devuelve el punto más cercano DEL
+ * SEGMENTO (no solo de sus extremos) más la distancia a ese punto.
+ * Aproximación plana simple (válida a escala de barrio/ciudad, no hace
+ * falta geodesia exacta para esta precisión).
+ */
+export function proyectarPuntoEnSegmento(
+  p: Punto,
+  a: Punto,
+  b: Punto
+): Punto & { distancia: number } {
+  const factorLng = Math.cos((a.lat * Math.PI) / 180);
+  const ax = a.lng * factorLng;
+  const ay = a.lat;
+  const bx = b.lng * factorLng;
+  const by = b.lat;
+  const px = p.lng * factorLng;
+  const py = p.lat;
+
+  const dx = bx - ax;
+  const dy = by - ay;
+  const largo2 = dx * dx + dy * dy;
+
+  let t = largo2 === 0 ? 0 : ((px - ax) * dx + (py - ay) * dy) / largo2;
+  t = Math.max(0, Math.min(1, t));
+
+  const proyectado: Punto = {
+    lat: a.lat + t * (b.lat - a.lat),
+    lng: a.lng + t * (b.lng - a.lng),
+  };
+
+  return { ...proyectado, distancia: distanciaMetros(p, proyectado) };
+}
+
+export interface TramoParaSnap {
+  id: string;
+  puntos: [number, number][]; // [lng, lat][]
+}
+
+export interface EmpalmePendiente {
+  tramoId: string;
+  segmentoIndice: number; // el punto nuevo va DESPUÉS de este índice
+}
+
+export interface ResultadoSnap {
+  punto: Punto;
+  empalme: EmpalmePendiente | null;
+}
+
+/**
+ * Punto de "pegado" al trazar, considerando TODO lo que puede conectar:
+ * 1. Elementos existentes (match exacto).
+ * 2. Vértices de tramos ya trazados (match exacto).
+ * 3. CUALQUIER punto a lo largo de un tramo, no solo sus vértices — acá
+ *    es donde antes fallaba: tocar el medio de una línea no la unía a
+ *    nada. Si el punto cae acá, se devuelve el `empalme` necesario para
+ *    partir el tramo viejo en ese punto exacto (así queda una unión
+ *    real, no solo dos líneas que pasan cerca).
+ */
+export function buscarPuntoDeSnap(
+  click: Punto,
+  puntosElementos: Punto[],
+  tramos: TramoParaSnap[],
+  umbralMetros: number
+): ResultadoSnap | null {
+  const vertices: Punto[] = [
+    ...puntosElementos,
+    ...tramos.flatMap((t) => t.puntos.map(([lng, lat]) => ({ lat, lng }))),
+  ];
+  const exacto = buscarPuntoCercano(click, vertices, umbralMetros);
+  if (exacto) return { punto: exacto, empalme: null };
+
+  let mejor: ResultadoSnap | null = null;
+  let mejorDistancia = umbralMetros;
+
+  for (const tramo of tramos) {
+    for (let i = 0; i < tramo.puntos.length - 1; i++) {
+      const [lngA, latA] = tramo.puntos[i];
+      const [lngB, latB] = tramo.puntos[i + 1];
+      const proy = proyectarPuntoEnSegmento(click, { lat: latA, lng: lngA }, { lat: latB, lng: lngB });
+      if (proy.distancia <= mejorDistancia) {
+        mejorDistancia = proy.distancia;
+        mejor = {
+          punto: { lat: proy.lat, lng: proy.lng },
+          empalme: { tramoId: tramo.id, segmentoIndice: i },
+        };
+      }
     }
   }
 

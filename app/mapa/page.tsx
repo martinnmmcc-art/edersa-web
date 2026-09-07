@@ -44,6 +44,12 @@ interface PuntoTrazado {
   empalme: EmpalmePendiente | null;
 }
 
+interface PuntoTrazado {
+  coord: [number, number];
+  conectado: boolean;
+  empalme: EmpalmePendiente | null;
+}
+
 export default function MapaPage() {
   const { usuario, setUsuario, cargado } = useUsuarioLocal();
   const { elementos, cargando, error, recargar } = useElementosEstado();
@@ -81,9 +87,7 @@ export default function MapaPage() {
   useEffect(() => {
     obtenerAlimentadores()
       .then((data) => setAlimentadores(data as Alimentador[]))
-      .catch(() => {
-        /* si falla (ej. offline), simplemente no se muestran filtros por alimentador */
-      });
+      .catch(() => {});
   }, []);
 
   const elementosFiltrados = useMemo(() => {

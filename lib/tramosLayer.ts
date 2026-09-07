@@ -45,7 +45,6 @@ export function dibujarTramos(map: MLMap, tramos: TramoLinea[]) {
 
   map.addSource(FUENTE_TRAMOS, { type: "geojson", data: data as any });
 
-  // MT: siempre visible, línea llena y gruesa (es la troncal).
   map.addLayer({
     id: CAPA_MT,
     type: "line",
@@ -58,8 +57,6 @@ export function dibujarTramos(map: MLMap, tramos: TramoLinea[]) {
     },
   });
 
-  // Área invisible más ancha debajo de MT, solo para que sea más fácil
-  // tocar la línea con el dedo (4px reales es muy angosto para eso).
   map.addLayer(
     {
       id: `${CAPA_MT}-hitbox`,
@@ -71,7 +68,6 @@ export function dibujarTramos(map: MLMap, tramos: TramoLinea[]) {
     CAPA_MT
   );
 
-  // BT: oculta hasta acercarse y aparece gradualmente.
   map.addLayer({
     id: CAPA_BT,
     type: "line",
@@ -112,8 +108,16 @@ export function dibujarTramos(map: MLMap, tramos: TramoLinea[]) {
  * Dibuja la línea "en construcción" mientras se está trazando, MÁS los
  * puntos ya tocados como círculos numerados — así se ve exactamente
  * dónde cayó cada tap, no solo la línea entre el 2do punto en adelante.
+ *
+ * `conectados[i]` indica si el punto i quedó "pegado" a un elemento u
+ * otro tramo (verde) o si quedó suelto en el aire (naranja) — feedback
+ * inmediato de si la conexión real se hizo o no.
  */
-export function dibujarPreviewTrazado(map: MLMap, puntos: [number, number][]) {
+export function dibujarPreviewTrazado(
+  map: MLMap,
+  puntos: [number, number][],
+  conectados: boolean[] = []
+) {
   const dataLinea = {
     type: "FeatureCollection" as const,
     features:
@@ -146,7 +150,7 @@ export function dibujarPreviewTrazado(map: MLMap, puntos: [number, number][]) {
     type: "FeatureCollection" as const,
     features: puntos.map((p, i) => ({
       type: "Feature" as const,
-      properties: { numero: String(i + 1) },
+      properties: { numero: String(i + 1), conectado: conectados[i] ? "si" : "no" },
       geometry: { type: "Point" as const, coordinates: p },
     })),
   };
@@ -164,7 +168,7 @@ export function dibujarPreviewTrazado(map: MLMap, puntos: [number, number][]) {
     source: FUENTE_PREVIEW_PUNTOS,
     paint: {
       "circle-radius": 9,
-      "circle-color": "#ffb100",
+      "circle-color": ["match", ["get", "conectado"], "si", "#22c55e", "#ffb100"],
       "circle-stroke-width": 2,
       "circle-stroke-color": "#0b0f14",
     },

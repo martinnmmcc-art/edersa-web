@@ -55,9 +55,6 @@ export function MapView({
   const onClickMapaRef = useRef(onClickMapa);
   const modoEspecialActivoRef = useRef(modoEspecialActivo);
 
-  // Refs para los callbacks: así el listener de click se registra UNA
-  // sola vez (no cada vez que el padre re-renderiza y pasa una función
-  // nueva) y siempre usa la versión más reciente igual.
   useEffect(() => {
     onSeleccionarTramoRef.current = onSeleccionarTramo;
     onClickMapaRef.current = onClickMapa;
@@ -137,7 +134,6 @@ export function MapView({
     };
   }, [map, mapListo]);
 
-  // Sincroniza los marcadores con la lista de elementos.
   useEffect(() => {
     if (!map || !mapListo) return;
 
