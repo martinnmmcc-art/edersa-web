@@ -12,10 +12,11 @@ import type { ElementoEstado, TramoLinea } from "@/types";
 interface MapViewProps {
   elementos: ElementoEstado[];
   elementoSeleccionadoId: string | null;
-  onSeleccionarElemento: (elemento: ElementoEstado) => void;
+  onTocarElemento: (elemento: ElementoEstado) => void;
   onClickMapa?: (coords: { lat: number; lng: number }) => void;
   tramos?: TramoLinea[];
   puntosTrazado?: [number, number][];
+  puntosConectados?: boolean[];
   onSeleccionarTramo?: (tramo: TramoSeleccionado) => void;
   elementosEnergizadosIds?: Set<string>;
 }
@@ -26,10 +27,11 @@ const CAPAS_HITBOX = [`${CAPA_MT}-hitbox`, `${CAPA_BT}-hitbox`];
 export function MapView({
   elementos,
   elementoSeleccionadoId,
-  onSeleccionarElemento,
+  onTocarElemento,
   onClickMapa,
   tramos = [],
   puntosTrazado = [],
+  puntosConectados = [],
   onSeleccionarTramo,
   elementosEnergizadosIds,
 }: MapViewProps) {
@@ -39,22 +41,15 @@ export function MapView({
   const marcadoresRef = useRef<Map<string, maplibregl.Marker>>(new Map());
   const tramosRef = useRef<TramoLinea[]>([]);
   const puntosTrazadoRef = useRef<[number, number][]>([]);
+  const puntosConectadosRef = useRef<boolean[]>([]);
   const onSeleccionarTramoRef = useRef(onSeleccionarTramo);
   const onClickMapaRef = useRef(onClickMapa);
 
-  // Refs para los callbacks: así el listener de click se registra UNA
-  // sola vez (no cada vez que el padre re-renderiza y pasa una función
-  // nueva) y siempre usa la versión más reciente igual.
   useEffect(() => {
     onSeleccionarTramoRef.current = onSeleccionarTramo;
     onClickMapaRef.current = onClickMapa;
   }, [onSeleccionarTramo, onClickMapa]);
 
-  // Un único listener de click para todo el mapa: primero pregunta si el
-  // toque cayó sobre un tramo (solo si esas capas ya existen — pedirle a
-  // MapLibre features de una capa que no existe todavía tira una
-  // excepción real, no un error controlado, y eso es lo que rompía la
-  // app) y si no, lo trata como un click genérico sobre el mapa.
   useEffect(() => {
     if (!map || !mapListo) return;
 
@@ -108,7 +103,6 @@ export function MapView({
     };
   }, [map, mapListo]);
 
-  // Sincroniza los marcadores con la lista de elementos.
   useEffect(() => {
     if (!map || !mapListo) return;
 
@@ -136,11 +130,8 @@ export function MapView({
         elementosEnergizadosIds ? elementosEnergizadosIds.has(elemento.id) : true
       );
       el.onclick = (ev) => {
-        // Evita que el toque sobre el marcador también le llegue al mapa
-        // (que en modo trazado/alta interpretaría el mismo toque como un
-        // click sobre el mapa vacío).
         ev.stopPropagation();
-        onSeleccionarElemento(elemento);
+        onTocarElemento(elemento);
       };
 
       const marker = new maplibregl.Marker({ element: el })
@@ -160,15 +151,16 @@ export function MapView({
 
   useEffect(() => {
     puntosTrazadoRef.current = puntosTrazado;
+    puntosConectadosRef.current = puntosConectados;
     if (!map || !mapListo) return;
-    dibujarPreviewTrazado(map, puntosTrazado);
-  }, [map, mapListo, puntosTrazado]);
+    dibujarPreviewTrazado(map, puntosTrazado, puntosConectados);
+  }, [map, mapListo, puntosTrazado, puntosConectados]);
 
   useEffect(() => {
     if (!map) return;
     const reagregar = () => {
       dibujarTramos(map, tramosRef.current);
-      dibujarPreviewTrazado(map, puntosTrazadoRef.current);
+      dibujarPreviewTrazado(map, puntosTrazadoRef.current, puntosConectadosRef.current);
     };
     map.on("style.load", reagregar);
     return () => {
