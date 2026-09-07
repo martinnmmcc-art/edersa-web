@@ -6,7 +6,7 @@ import {
   actualizarElemento,
   darDeBajaElemento,
 } from "@/services/elementosService";
-import { COLOR_ESTADO, LABEL_ESTADO, LABEL_TIPO, TIPOS_SIN_MANIOBRA } from "@/lib/estado";
+import { COLOR_ESTADO, LABEL_ESTADO, LABEL_TIPO, TIPOS_SIN_MANIOBRA, TIPOS_INTERRUPTOR } from "@/lib/estado";
 import { SalidasBTPanel } from "./SalidasBTPanel";
 import type { Alimentador, ElementoEstado, TipoMotivo } from "@/types";
 
@@ -63,11 +63,18 @@ export function EventPanel({
     const alimentador_id = (form.get("alimentador_id") as string) || null;
     const alimentador_id_b = (form.get("alimentador_id_b") as string) || null;
     const es_fuente = form.get("es_fuente") === "on";
+    const es_punto_anillo = form.get("es_punto_anillo") === "on";
     if (nombre.length < 2) return;
 
     setGuardandoEdicion(true);
     try {
-      await actualizarElemento(elemento.id, { nombre, alimentador_id, alimentador_id_b, es_fuente });
+      await actualizarElemento(elemento.id, {
+        nombre,
+        alimentador_id,
+        alimentador_id_b,
+        es_fuente,
+        es_punto_anillo,
+      });
       onEventoRegistrado(false);
       onCerrarPanel();
     } finally {
@@ -131,6 +138,18 @@ export function EventPanel({
             />
             Es un punto de alimentación (fuente de energía)
           </label>
+
+          {TIPOS_INTERRUPTOR.has(elemento.tipo) && (
+            <label className="flex items-center gap-2 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                name="es_punto_anillo"
+                defaultChecked={elemento.es_punto_anillo}
+                className="w-5 h-5"
+              />
+              Es un punto de anillo (abierto es su estado normal)
+            </label>
+          )}
 
           {elemento.tipo === "omnirouter" && (
             <label className="flex flex-col gap-1 text-sm text-slate-300">
@@ -222,6 +241,11 @@ export function EventPanel({
             {elemento.es_fuente && (
               <p className="text-xs mt-1 text-estado-cerrado font-semibold">
                 ⚡ Punto de alimentación (fuente)
+              </p>
+            )}
+            {elemento.es_punto_anillo && (
+              <p className="text-xs mt-1 text-acento font-semibold">
+                🔄 Punto de anillo — abierto es su estado normal
               </p>
             )}
             {elemento.alimentador_b_nombre && (

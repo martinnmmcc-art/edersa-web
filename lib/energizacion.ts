@@ -1,9 +1,5 @@
+import { TIPOS_INTERRUPTOR } from "@/lib/estado";
 import type { ElementoEstado, TramoLinea } from "@/types";
-
-// Elementos que "cortan" el circuito cuando están abiertos. El resto
-// (transformador, capacitor, generador) son derivaciones/consumos: no
-// interrumpen el paso de la línea aunque estén en el medio del trazado.
-const TIPOS_INTERRUPTOR = new Set(["reconectador", "seccionador", "cuchilla", "omnirouter"]);
 
 // Por más que no estén marcados a mano como "fuente", estos tipos
 // siempre inyectan energía (si existen en el mapa).

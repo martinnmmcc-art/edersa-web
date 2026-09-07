@@ -5,7 +5,7 @@ import { crearElemento } from "@/services/elementosService";
 import { crearTransformador } from "@/services/transformadoresService";
 import { crearCapacitor } from "@/services/capacitoresService";
 import { crearGenerador } from "@/services/generadoresService";
-import { LABEL_TIPO } from "@/lib/estado";
+import { LABEL_TIPO, TIPOS_INTERRUPTOR } from "@/lib/estado";
 import type { Alimentador, TensionSecundariaBT, TipoElemento } from "@/types";
 
 interface ElementoFormProps {
@@ -50,6 +50,7 @@ export function ElementoForm({
     const alimentador_id = (form.get("alimentador_id") as string) || null;
     const alimentador_id_b = (form.get("alimentador_id_b") as string) || null;
     const es_fuente = form.get("es_fuente") === "on";
+    const es_punto_anillo = form.get("es_punto_anillo") === "on";
 
     if (Number.isNaN(lat) || Number.isNaN(lng)) {
       setErrorMsg("Ubicación inválida. Tocá el mapa para fijar el punto.");
@@ -96,7 +97,16 @@ export function ElementoForm({
           tension_salida_kv: Number(form.get("tension_salida_kv")),
         });
       } else {
-        await crearElemento({ nombre, tipo, alimentador_id, alimentador_id_b, es_fuente, lat, lng });
+        await crearElemento({
+          nombre,
+          tipo,
+          alimentador_id,
+          alimentador_id_b,
+          es_fuente,
+          es_punto_anillo,
+          lat,
+          lng,
+        });
       }
       onCreado();
       onCerrar();
@@ -169,6 +179,21 @@ export function ElementoForm({
             barra, la central térmica, o el reconectador de cabecera de un
             alimentador (Sur, Norte, etc).
           </span>
+
+          {TIPOS_INTERRUPTOR.has(tipo) && (
+            <>
+              <label className="flex items-center gap-2 text-sm text-slate-300">
+                <input type="checkbox" name="es_punto_anillo" className="w-5 h-5" />
+                Es un punto de anillo
+              </label>
+              <span className="text-xs text-slate-500 -mt-2">
+                Marcalo si este interruptor normalmente está abierto (uso
+                para anillar/transferir carga). Así no va a aparecer en las
+                alertas de "abierto" del mapa cuando esté en su posición
+                normal.
+              </span>
+            </>
+          )}
 
           {tipo === "omnirouter" && (
             <Campo label="Segundo alimentador (si anilla / transfiere carga)">

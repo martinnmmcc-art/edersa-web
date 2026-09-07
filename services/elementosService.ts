@@ -54,6 +54,7 @@ export async function crearElemento(input: {
   alimentador_id: string | null;
   alimentador_id_b?: string | null;
   es_fuente?: boolean;
+  es_punto_anillo?: boolean;
   lat: number;
   lng: number;
   codigo?: string;
@@ -66,6 +67,7 @@ export async function crearElemento(input: {
       alimentador_id: input.alimentador_id,
       alimentador_id_b: input.alimentador_id_b ?? null,
       es_fuente: input.es_fuente ?? false,
+      es_punto_anillo: input.es_punto_anillo ?? false,
       lat: input.lat,
       lng: input.lng,
       codigo: input.codigo,
@@ -84,6 +86,7 @@ export async function actualizarElemento(
     alimentador_id?: string | null;
     alimentador_id_b?: string | null;
     es_fuente?: boolean;
+    es_punto_anillo?: boolean;
   }
 ) {
   const { error } = await supabase.from("elementos").update(cambios).eq("id", id);

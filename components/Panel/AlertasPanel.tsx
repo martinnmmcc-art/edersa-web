@@ -42,7 +42,9 @@ export function AlertasPanel({ elementos }: AlertasPanelProps) {
     return cancelar;
   }, []);
 
-  const elementosAbiertos = elementos.filter((e) => e.estado === "abierto");
+  const elementosAbiertos = elementos.filter(
+    (e) => e.estado === "abierto" && !e.es_punto_anillo
+  );
   const total = elementosAbiertos.length + salidasAbiertas.length;
 
   return (

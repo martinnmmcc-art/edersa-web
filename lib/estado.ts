@@ -40,3 +40,13 @@ export const TIPOS_SIN_MANIOBRA: ReadonlySet<TipoElemento> = new Set([
   "central_termica",
   "barra",
 ]);
+
+// Interruptores: los que efectivamente cortan el circuito cuando están
+// abiertos (usado también por el motor de energización). Un punto de
+// anillo solo tiene sentido marcarlo en uno de estos tipos.
+export const TIPOS_INTERRUPTOR: ReadonlySet<TipoElemento> = new Set([
+  "reconectador",
+  "seccionador",
+  "cuchilla",
+  "omnirouter",
+]);

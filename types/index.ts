@@ -35,6 +35,7 @@ export interface ElementoEstado {
   alimentador_id_b: string | null;
   alimentador_b_nombre: string | null;
   es_fuente: boolean;
+  es_punto_anillo: boolean;
   lat: number;
   lng: number;
   codigo: string | null;
@@ -130,6 +131,7 @@ export interface NuevoElementoInput {
   alimentador_id: string | null;
   alimentador_id_b?: string | null;
   es_fuente?: boolean;
+  es_punto_anillo?: boolean;
   lat: number;
   lng: number;
   codigo?: string;
@@ -141,6 +143,7 @@ export interface ActualizarElementoInput {
   alimentador_id: string | null;
   alimentador_id_b?: string | null;
   es_fuente?: boolean;
+  es_punto_anillo?: boolean;
 }
 
 export type ModoMapa = "calles" | "satelite" | "hibrida" | "topografico";
