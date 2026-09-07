@@ -103,15 +103,17 @@ export function MapView({
       onClickMapaRef.current?.({
         lat: e.lngLat.lat,
         lng: e.lngLat.lng,
-        // Radio de "pegado" pensado en píxeles de pantalla (~18px), no
-        // en metros fijos — así el margen de tacto es siempre parecido
-        // sin importar el zoom. Se achicó de 40 a 18 porque con líneas
-        // de alimentadores distintos pasando muy cerca (mismo poste),
-        // un radio grande las terminaba uniendo por error.
+        // Radio de "pegado" pensado en píxeles de pantalla (~26px, el
+        // ancho aproximado de un dedo), no en metros fijos — así el
+        // margen de tacto es siempre parecido sin importar el zoom.
+        // 18px había quedado demasiado ajustado (casi imposible de
+        // tocar a propósito); para el caso de líneas paralelas muy
+        // cerca, usá el interruptor "🧲 Pegado" para apagarlo en vez de
+        // depender de un radio microscópico.
         radioSnapMetros:
           (156543.03392 * Math.cos((e.lngLat.lat * Math.PI) / 180)) /
           Math.pow(2, map.getZoom()) *
-          18,
+          26,
       });
     };
 
