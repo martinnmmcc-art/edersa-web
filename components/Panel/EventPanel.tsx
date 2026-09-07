@@ -124,6 +124,18 @@ export function EventPanel({
     setSoldando(true);
     setMensajeSoldadura(null);
     try {
+      // Si el elemento ya es, bit a bit, un vértice de algún tramo, ya
+      // está soldado — no hace falta (ni conviene) buscar de nuevo:
+      // como su propia coordenada sería "el segmento más cercano" a sí
+      // misma, podía terminar insertándose un duplicado al lado suyo.
+      const yaSoldado = tramos.some((t) =>
+        t.puntos.some(([lng, lat]) => lng === elemento.lng && lat === elemento.lat)
+      );
+      if (yaSoldado) {
+        setMensajeSoldadura("Ya está unido a una línea — no hace falta soldarlo de nuevo.");
+        return;
+      }
+
       const resultado = buscarSegmentoMasCercano(
         { lat: elemento.lat, lng: elemento.lng },
         tramos,
