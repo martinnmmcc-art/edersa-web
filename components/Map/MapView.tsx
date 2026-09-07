@@ -12,9 +12,6 @@ import type { ElementoEstado, TramoLinea } from "@/types";
 interface MapViewProps {
   elementos: ElementoEstado[];
   elementoSeleccionadoId: string | null;
-  // El padre decide qué hacer con el toque a un elemento — puede ser
-  // "abrir su panel" (modo normal), "agregar este punto al trazado"
-  // (modo trazado) o "fijarlo como origen/destino" (modo conectar).
   onTocarElemento: (elemento: ElementoEstado) => void;
   onClickMapa?: (coords: { lat: number; lng: number; radioSnapMetros: number }) => void;
   tramos?: TramoLinea[];
@@ -22,10 +19,6 @@ interface MapViewProps {
   puntosConectados?: boolean[];
   onSeleccionarTramo?: (tramo: TramoSeleccionado) => void;
   elementosEnergizadosIds?: Set<string>;
-  // Cuando hay un modo especial activo (trazado, conectar, alta de
-  // elemento), tocar una línea existente tiene que darle al padre la
-  // coordenada real del toque (para poder empalmar ahí), no abrir la
-  // ficha de esa línea.
   modoEspecialActivo?: boolean;
 }
 
@@ -61,13 +54,6 @@ export function MapView({
     modoEspecialActivoRef.current = modoEspecialActivo;
   }, [onSeleccionarTramo, onClickMapa, modoEspecialActivo]);
 
-  // Un único listener de click para todo el mapa. En modo normal,
-  // tocar una línea abre su ficha. En un modo especial (trazado,
-  // conectar, alta), el toque SIEMPRE se manda como coordenada cruda al
-  // padre — incluso si cayó justo sobre una línea — porque ahí lo que
-  // se quiere es arrancar/continuar un trazado desde ese punto, no ver
-  // la info de la línea existente. Antes esto se comía el toque cuando
-  // caía sobre una línea, y por eso dos trazados nunca se unían.
   useEffect(() => {
     if (!map || !mapListo) return;
 
@@ -100,14 +86,10 @@ export function MapView({
       onClickMapaRef.current?.({
         lat: e.lngLat.lat,
         lng: e.lngLat.lng,
-        // Radio de "pegado" pensado en píxeles de pantalla, no en metros
-        // fijos: a un zoom alejado, 15 metros fijos son un punto
-        // imposible de tocar con el dedo; convertido a un radio táctil
-        // constante (~28px), es fácil de tocar a cualquier zoom.
         radioSnapMetros:
           (156543.03392 * Math.cos((e.lngLat.lat * Math.PI) / 180)) /
           Math.pow(2, map.getZoom()) *
-          28,
+          40,
       });
     };
 
@@ -161,11 +143,6 @@ export function MapView({
         elementosEnergizadosIds ? elementosEnergizadosIds.has(elemento.id) : true
       );
       el.onclick = (ev) => {
-        // Evita que el toque sobre el marcador también le llegue al mapa
-        // (que lo interpretaría además como un click sobre el mapa
-        // vacío). El padre decide qué hacer con este toque según el
-        // modo activo — puede ser justamente "agregar este punto al
-        // trazado", así que YA NO se ignora en esos modos.
         ev.stopPropagation();
         onTocarElemento(elemento);
       };
